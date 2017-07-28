@@ -14,8 +14,7 @@ import (
 	. "github.com/unidoc/unidoc/pdf/core"
 )
 
-//
-// The colorspace defines the data storage format for each color and color representation.
+// PdfColorspace defines the data storage format color representation for each PDF colorspace
 //
 // Device based colorspace, specified by name
 // - /DeviceGray
@@ -47,7 +46,28 @@ type PdfColorspace interface {
 	ColorFromFloats(vals []float64) (PdfColor, error)
 }
 
+// PdfColor is the interface that colors values must satisfy.
+// There is a color value type (which satisfies PdfColor) for each colorspace PdfColorspace (which satisfies
+// PdfColorspace)
+// e.g. type PdfColorDeviceGray float64
+//      PdfColorDeviceGray is a color value for colorspace PdfColorspaceDeviceGray
 type PdfColor interface {
+	// IsColored() bool
+}
+
+var AllColorspaces = map[PdfColorspace]int{}
+
+func IsColorspaceColored(cs PdfColorspace) (bool, bool) {
+	AllColorspaces[cs] += 1
+	switch cs.(type) {
+	case *PdfColorspaceDeviceGray, *PdfColorspaceCalGray:
+		return false, true
+	case *PdfColorspaceDeviceRGB, *PdfColorspaceDeviceCMYK, *PdfColorspaceICCBased:
+		return true, true
+	}
+	common.Log.Error("IsColorspaceColor: Unknown colorspace cs=%T=%q", cs, cs)
+	panic("wtf")
+	return true, false
 }
 
 func newPdfColorspaceFromPdfObject(obj PdfObject) (PdfColorspace, error) {
@@ -154,6 +174,10 @@ func (this *PdfColorDeviceGray) GetNumComponents() int {
 	return 1
 }
 
+func (this *PdfColorDeviceGray) IsColored() bool {
+	return false
+}
+
 func (this *PdfColorDeviceGray) Val() float64 {
 	return float64(*this)
 }
@@ -194,6 +218,10 @@ func (this *PdfColorspaceDeviceGray) ColorFromFloats(vals []float64) (PdfColor, 
 	}
 
 	return NewPdfColorDeviceGray(val), nil
+}
+
+func (this *PdfColorspaceDeviceGray) IsColored(color PdfColor) bool {
+	return true
 }
 
 func (this *PdfColorspaceDeviceGray) ColorFromPdfObjects(objects []PdfObject) (PdfColor, error) {
@@ -259,6 +287,10 @@ func NewPdfColorDeviceRGB(r, g, b float64) *PdfColorDeviceRGB {
 
 func (this *PdfColorDeviceRGB) GetNumComponents() int {
 	return 3
+}
+
+func (this *PdfColorDeviceRGB) IsColored() bool {
+	return this[0] != this[1] || this[1] != this[2]
 }
 
 func (this *PdfColorDeviceRGB) R() float64 {
@@ -334,7 +366,6 @@ func (this *PdfColorspaceDeviceRGB) ColorFromFloats(vals []float64) (PdfColor, e
 
 	color := NewPdfColorDeviceRGB(r, g, b)
 	return color, nil
-
 }
 
 // Get the color from a series of pdf objects (3 for rgb).
@@ -396,6 +427,23 @@ func (this *PdfColorspaceDeviceRGB) ImageToGray(img Image) (Image, error) {
 	return grayImage, nil
 }
 
+func (this *PdfColorspaceDeviceRGB) IsImageColored(img Image) bool {
+
+	samples := img.GetSamples()
+	maxVal := math.Pow(2, float64(img.BitsPerComponent)) - 1
+
+	for i := 0; i < len(samples); i += 3 {
+		// Normalized data, range 0-1.
+		r := float64(samples[i]) / maxVal
+		g := float64(samples[i+1]) / maxVal
+		b := float64(samples[i+2]) / maxVal
+		if r != g || g != b {
+			return true
+		}
+	}
+	return false
+}
+
 //////////////////////
 // DeviceCMYK
 // C, M, Y, K components.
@@ -411,6 +459,10 @@ func NewPdfColorDeviceCMYK(c, m, y, k float64) *PdfColorDeviceCMYK {
 
 func (this *PdfColorDeviceCMYK) GetNumComponents() int {
 	return 4
+}
+
+func (this *PdfColorDeviceCMYK) IsColored() bool {
+	return this[0] != this[1] || this[1] != this[2]
 }
 
 func (this *PdfColorDeviceCMYK) C() float64 {
@@ -484,6 +536,10 @@ func (this *PdfColorspaceDeviceCMYK) ColorFromFloats(vals []float64) (PdfColor, 
 
 	color := NewPdfColorDeviceCMYK(c, m, y, k)
 	return color, nil
+}
+
+func (this *PdfColorspaceDeviceCMYK) IsColored(color PdfColorDeviceCMYK) bool {
+	return color.C() != color.M() || color.M() != color.Y()
 }
 
 // Get the color from a series of pdf objects (4 for cmyk).
@@ -595,6 +651,10 @@ func NewPdfColorCalGray(grayVal float64) *PdfColorCalGray {
 
 func (this *PdfColorCalGray) GetNumComponents() int {
 	return 1
+}
+
+func (this *PdfColorCalGray) IsColored() bool {
+	return false
 }
 
 func (this *PdfColorCalGray) Val() float64 {
@@ -859,6 +919,10 @@ func NewPdfColorCalRGB(a, b, c float64) *PdfColorCalRGB {
 
 func (this *PdfColorCalRGB) GetNumComponents() int {
 	return 3
+}
+
+func (this *PdfColorCalRGB) IsColored() bool {
+	return this[0] != this[1] || this[1] != this[2]
 }
 
 func (this *PdfColorCalRGB) A() float64 {
@@ -1187,6 +1251,10 @@ func NewPdfColorLab(l, a, b float64) *PdfColorLab {
 
 func (this *PdfColorLab) GetNumComponents() int {
 	return 3
+}
+
+func (this *PdfColorLab) IsColored() bool {
+	return this[1] != 0.0 || this[2] != 0.0
 }
 
 func (this *PdfColorLab) L() float64 {

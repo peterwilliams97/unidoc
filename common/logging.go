@@ -64,7 +64,6 @@ func NewConsoleLogger(logLevel LogLevel) *ConsoleLogger {
 	return &logger
 }
 
-const DebugOutput = false
 
 func (this ConsoleLogger) Error(format string, args ...interface{}) {
 	if this.LogLevel >= LogLevelError {
@@ -112,7 +111,6 @@ var Log Logger = DummyLogger{}
 
 func SetLogger(logger Logger) {
 	Log = logger
-	fmt.Printf("SetLogger: logger=%+v\n", logger)
 }
 
 // output writes `format`, `args` log message prefixed by the source file name, line and `prefix`
