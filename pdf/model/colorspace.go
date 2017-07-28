@@ -568,13 +568,16 @@ func (this *PdfColorspaceDeviceCMYK) ColorToRGB(color PdfColor) (PdfColor, error
 	y := cmyk.Y()
 	k := cmyk.K()
 
-	c = c*(1-k) + k
-	m = m*(1-k) + k
-	y = y*(1-k) + k
-
+	// Peter Williams. I need a cmyk->rgb conversion that gives r!=g or g!=b when c!=m or m!=y
 	r := 1 - c
 	g := 1 - m
 	b := 1 - y
+
+	if k != 1 {
+		r *= 1 - k
+		g *= 1 - k
+		b *= 1 - k
+	}
 
 	return NewPdfColorDeviceRGB(r, g, b), nil
 }
