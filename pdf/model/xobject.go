@@ -292,7 +292,7 @@ func UpdateXObjectImageFromImage(baseXObj *XObjectImage, img *Image, cs PdfColor
 	return xobj, nil
 }
 
-// Build the image xobject from a stream object.
+// NewXObjectImageFromStream build an image xobject from a stream object.
 // An image dictionary is the dictionary portion of a stream object representing an image XObject.
 func NewXObjectImageFromStream(stream *PdfObjectStream) (*XObjectImage, error) {
 	img := &XObjectImage{}

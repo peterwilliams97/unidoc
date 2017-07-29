@@ -513,7 +513,7 @@ func (this *PdfPage) GetPageDict() *PdfObjectDictionary {
 	return p
 }
 
-// Get the page object as an indirect object.  Wraps the Page
+// Get the page object as an indirect objects.  Wraps the Page
 // dictionary into an indirect object.
 func (this *PdfPage) GetPageAsIndirectObject() *PdfIndirectObject {
 	return this.primitive

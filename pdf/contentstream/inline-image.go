@@ -36,7 +36,6 @@ func NewInlineImageFromImage(img Image, encoder StreamEncoder) (*ContentStreamIn
 	if encoder == nil {
 		encoder = NewRawEncoder()
 	}
-	common.Log.Debug("NewInlineImageFromImage: encoder=%T", encoder)
 
 	inlineImage := ContentStreamInlineImage{}
 	if img.ColorComponents == 1 {
@@ -174,7 +173,7 @@ func (this *ContentStreamInlineImage) GetColorSpace(resources *PdfPageResources)
 	} else {
 		if resources.ColorSpace == nil {
 			// Can also refer to a name in the PDF page resources...
-			common.Log.Debug("Error, unsupported inline image colorspace: %s", *name)
+			common.Log.Error("Unsupported inline image colorspace: %s", *name)
 			return nil, errors.New("Unknown colorspace")
 		}
 
@@ -257,7 +256,7 @@ func (this *ContentStreamInlineImage) ToImage(resources *PdfPageResources) (*Ima
 	}
 
 	if isMask {
-		// Masks are grayscale 1bpc.
+		// Masks are grayscale 1 bpc.
 		image.BitsPerComponent = 1
 		image.ColorComponents = 1
 	} else {

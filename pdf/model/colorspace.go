@@ -289,8 +289,14 @@ func (this *PdfColorDeviceRGB) GetNumComponents() int {
 	return 3
 }
 
+const colTol = 0.5 / 255.0
+
+func visible(x float64) bool {
+	return math.Abs(x) > colTol
+}
+
 func (this *PdfColorDeviceRGB) IsColored() bool {
-	return this[0] != this[1] || this[1] != this[2]
+	return visible(this[0]-this[1]) || visible(this[1]-this[2])
 }
 
 func (this *PdfColorDeviceRGB) R() float64 {
@@ -462,7 +468,7 @@ func (this *PdfColorDeviceCMYK) GetNumComponents() int {
 }
 
 func (this *PdfColorDeviceCMYK) IsColored() bool {
-	return this[0] != this[1] || this[1] != this[2]
+	return visible(this[0]-this[1]) || visible(this[1]-this[2])
 }
 
 func (this *PdfColorDeviceCMYK) C() float64 {
@@ -536,10 +542,6 @@ func (this *PdfColorspaceDeviceCMYK) ColorFromFloats(vals []float64) (PdfColor, 
 
 	color := NewPdfColorDeviceCMYK(c, m, y, k)
 	return color, nil
-}
-
-func (this *PdfColorspaceDeviceCMYK) IsColored(color PdfColorDeviceCMYK) bool {
-	return color.C() != color.M() || color.M() != color.Y()
 }
 
 // Get the color from a series of pdf objects (4 for cmyk).
@@ -925,7 +927,7 @@ func (this *PdfColorCalRGB) GetNumComponents() int {
 }
 
 func (this *PdfColorCalRGB) IsColored() bool {
-	return this[0] != this[1] || this[1] != this[2]
+	return visible(this[0]-this[1]) || visible(this[1]-this[2])
 }
 
 func (this *PdfColorCalRGB) A() float64 {
@@ -1257,7 +1259,7 @@ func (this *PdfColorLab) GetNumComponents() int {
 }
 
 func (this *PdfColorLab) IsColored() bool {
-	return this[1] != 0.0 || this[2] != 0.0
+	return visible(this[1]) || visible(this[2])
 }
 
 func (this *PdfColorLab) L() float64 {

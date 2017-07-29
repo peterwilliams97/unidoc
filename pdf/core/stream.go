@@ -6,12 +6,13 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/unidoc/unidoc/common"
 )
 
-// Creates the encoder from the stream's dictionary.
+// NewEncoderFromStream creates an encoder from `streamObj`'s dictionary.
 func NewEncoderFromStream(streamObj *PdfObjectStream) (StreamEncoder, error) {
 	filterObj := streamObj.PdfObjectDictionary.Get("Filter")
 	if filterObj == nil {
@@ -29,7 +30,7 @@ func NewEncoderFromStream(streamObj *PdfObjectStream) (StreamEncoder, error) {
 	if !ok {
 		array, ok := filterObj.(*PdfObjectArray)
 		if !ok {
-			return nil, fmt.Errorf("Filter not a Name or Array object")
+			return nil, errors.New("Filter not a Name or Array object")
 		}
 		if len(*array) == 0 {
 			// Empty array -> indicates raw filter (no filter).
@@ -43,7 +44,7 @@ func NewEncoderFromStream(streamObj *PdfObjectStream) (StreamEncoder, error) {
 				return nil, err
 			}
 
-			common.Log.Trace("Multi enc: %s\n", menc)
+			common.Log.Trace("Multi enc: %s", menc)
 			return menc, nil
 		}
 
@@ -54,7 +55,7 @@ func NewEncoderFromStream(streamObj *PdfObjectStream) (StreamEncoder, error) {
 			return nil, fmt.Errorf("Filter array member not a Name object")
 		}
 	}
-
+	// !@#$ switch
 	if *method == StreamEncodingFilterNameFlate {
 		return newFlateEncoderFromStream(streamObj, nil)
 	} else if *method == StreamEncodingFilterNameLZW {
@@ -65,9 +66,17 @@ func NewEncoderFromStream(streamObj *PdfObjectStream) (StreamEncoder, error) {
 		return NewASCIIHexEncoder(), nil
 	} else if *method == StreamEncodingFilterNameASCII85 {
 		return NewASCII85Encoder(), nil
+	} else if *method == StreamEncodingFilterNameCCITTFax {
+		return NewCCITTFaxEncoder(), nil
+	} else if *method == StreamEncodingFilterNameJBIG2 {
+		return NewJBIG2Encoder(), nil
+	} else if *method == StreamEncodingFilterNameJPX {
+		return NewJPXEncoder(), nil
 	} else {
-		common.Log.Debug("ERROR: Unsupported encoding method!")
-		return nil, fmt.Errorf("Unsupported encoding method (%s)", *method)
+		err := fmt.Errorf("Unsupported encoding method (%s)", *method)
+		common.Log.Error("err=%v", err)
+		panic(err)
+		return nil, err
 	}
 }
 
@@ -78,14 +87,15 @@ func DecodeStream(streamObj *PdfObjectStream) ([]byte, error) {
 
 	encoder, err := NewEncoderFromStream(streamObj)
 	if err != nil {
-		common.Log.Debug("Stream decoding failed: %v", err)
+		common.Log.Error("Stream decoding failed: %v", err)
 		return nil, err
 	}
-	common.Log.Trace("Encoder: %#v\n", encoder)
+	common.Log.Trace("Encoder: %#v", encoder)
 
 	decoded, err := encoder.DecodeStream(streamObj)
 	if err != nil {
-		common.Log.Debug("Stream decoding failed: %v", err)
+		common.Log.Error("Stream decoding failed: %v", err)
+		// panic(err)
 		return nil, err
 	}
 

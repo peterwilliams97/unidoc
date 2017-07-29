@@ -23,7 +23,6 @@ import (
 	gocolor "image/color"
 	"image/jpeg"
 	"io"
-
 	// Need two slightly different implementations of LZW (EarlyChange parameter).
 	lzw0 "compress/lzw"
 
@@ -38,6 +37,9 @@ const (
 	StreamEncodingFilterNameDCT      = "DCTDecode"
 	StreamEncodingFilterNameASCIIHex = "ASCIIHexDecode"
 	StreamEncodingFilterNameASCII85  = "ASCII85Decode"
+	StreamEncodingFilterNameCCITTFax = "CCITTFaxDecode"
+	StreamEncodingFilterNameJBIG2    = "JBIG2Decode"
+	StreamEncodingFilterNameJPX      = "JPXDecode"
 	StreamEncodingFilterNameRaw      = "Raw"
 )
 
@@ -253,6 +255,10 @@ func (this *FlateEncoder) DecodeStream(streamObj *PdfObjectStream) ([]byte, erro
 			common.Log.Trace("Colors: %d", this.Colors)
 
 			rowLength := int(this.Columns) * this.Colors
+			if rowLength < 1 {
+				// No data. Return empty set.
+				return []byte{}, nil
+			}
 			rows := len(outData) / rowLength
 			if len(outData)%rowLength != 0 {
 				common.Log.Error("TIFF encoding: Invalid row length (%d/%d)",
@@ -558,8 +564,9 @@ func newLZWEncoderFromStream(streamObj *PdfObjectStream, decodeParams *PdfObject
 	if obj != nil {
 		bpc, ok := obj.(*PdfObjectInteger)
 		if !ok {
-			common.Log.Debug("ERROR: Invalid BitsPerComponent")
-			return nil, fmt.Errorf("Invalid BitsPerComponent")
+			err := errors.New("Invalid BitsPerComponent")
+			common.Log.Error("err=%v", err)
+			return nil, err
 		}
 		encoder.BitsPerComponent = int(*bpc)
 	}
@@ -716,7 +723,7 @@ func (this *LZWEncoder) DecodeStream(streamObj *PdfObjectStream) ([]byte, error)
 			pOutData := pOutBuffer.Bytes()
 			return pOutData, nil
 		} else {
-			common.Log.Debug("ERROR: Unsupported predictor (%d)", this.Predictor)
+			common.Log.Error("Unsupported predictor (%d)", this.Predictor)
 			return nil, fmt.Errorf("Unsupported predictor (%d)", this.Predictor)
 		}
 	}
@@ -857,7 +864,8 @@ func (this *DCTEncoder) DecodeBytes(encoded []byte) ([]byte, error) {
 	//img, _, err := goimage.Decode(bufReader)
 	img, err := jpeg.Decode(bufReader)
 	if err != nil {
-		common.Log.Debug("Error decoding image: %s", err)
+		common.Log.Error("Error decoding image: %s", err)
+		// panic(err)
 		return nil, err
 	}
 	bounds := img.Bounds()
@@ -1049,6 +1057,7 @@ func (this *DCTEncoder) EncodeBytes(data []byte) ([]byte, error) {
 	var buf bytes.Buffer
 	err := jpeg.Encode(&buf, img, &opt)
 	if err != nil {
+		panic(err)
 		return nil, err
 	}
 
@@ -1333,6 +1342,122 @@ func (this *RawEncoder) DecodeStream(streamObj *PdfObjectStream) ([]byte, error)
 }
 
 func (this *RawEncoder) EncodeBytes(data []byte) ([]byte, error) {
+	return data, nil
+}
+
+//
+// CCITTFax encoder/decoder (dummy, for now)
+//
+type CCITTFaxEncoder struct{}
+
+var ErrNoCCITT = errors.New("CCITTFaxEncoder is not implemented")
+
+func NewCCITTFaxEncoder() *CCITTFaxEncoder {
+	return &CCITTFaxEncoder{}
+}
+
+func (this *CCITTFaxEncoder) GetFilterName() string {
+	return StreamEncodingFilterNameCCITTFax
+}
+
+func (this *CCITTFaxEncoder) MakeDecodeParams() PdfObject {
+	// panic(ErrNoCCITT)
+	return nil
+}
+
+// Make a new instance of an encoding dictionary for a stream object.
+func (this *CCITTFaxEncoder) MakeStreamDict() *PdfObjectDictionary {
+	// panic(ErrNoCCITT)
+	return MakeDict()
+}
+
+func (this *CCITTFaxEncoder) DecodeBytes(encoded []byte) ([]byte, error) {
+	// panic(ErrNoCCITT)
+	return encoded, nil
+}
+
+func (this *CCITTFaxEncoder) DecodeStream(streamObj *PdfObjectStream) ([]byte, error) {
+	// panic(ErrNoCCITT)
+	return streamObj.Stream, nil
+}
+
+func (this *CCITTFaxEncoder) EncodeBytes(data []byte) ([]byte, error) {
+	// panic(ErrNoCCITT)
+	return data, nil
+}
+
+//
+// JBIG2 encoder/decoder (dummy, for now)
+//
+type JBIG2Encoder struct{}
+
+var ErrNoJBIG2 = errors.New("JBIG2Encoder is not implemented")
+
+func NewJBIG2Encoder() *JBIG2Encoder {
+	return &JBIG2Encoder{}
+}
+
+func (this *JBIG2Encoder) GetFilterName() string {
+	return StreamEncodingFilterNameJBIG2
+}
+
+func (this *JBIG2Encoder) MakeDecodeParams() PdfObject {
+	// panic(ErrNoCCITT)
+	return nil
+}
+
+// Make a new instance of an encoding dictionary for a stream object.
+func (this *JBIG2Encoder) MakeStreamDict() *PdfObjectDictionary {
+	// panic(ErrNoCCITT)
+	return MakeDict()
+}
+
+func (this *JBIG2Encoder) DecodeBytes(encoded []byte) ([]byte, error) {
+	// panic(ErrNoCCITT)
+	return encoded, nil
+}
+
+func (this *JBIG2Encoder) DecodeStream(streamObj *PdfObjectStream) ([]byte, error) {
+	// panic(ErrNoCCITT)
+	return streamObj.Stream, nil
+}
+
+func (this *JBIG2Encoder) EncodeBytes(data []byte) ([]byte, error) {
+	// panic(ErrNoCCITT)
+	return data, nil
+}
+
+//
+// JPX encoder/decoder (dummy, for now)
+//
+type JPXEncoder struct{}
+
+func NewJPXEncoder() *JPXEncoder {
+	return &JPXEncoder{}
+}
+
+func (this *JPXEncoder) GetFilterName() string {
+	return StreamEncodingFilterNameJPX
+}
+
+func (this *JPXEncoder) MakeDecodeParams() PdfObject {
+	return nil
+}
+
+// Make a new instance of an encoding dictionary for a stream object.
+func (this *JPXEncoder) MakeStreamDict() *PdfObjectDictionary {
+	return MakeDict()
+}
+
+func (this *JPXEncoder) DecodeBytes(encoded []byte) ([]byte, error) {
+	return encoded, nil
+}
+
+func (this *JPXEncoder) DecodeStream(streamObj *PdfObjectStream) ([]byte, error) {
+	return streamObj.Stream, nil
+}
+
+func (this *JPXEncoder) EncodeBytes(data []byte) ([]byte, error) {
 	return data, nil
 }
 

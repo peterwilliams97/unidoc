@@ -884,6 +884,7 @@ func (this *PSOperand) Index(stack *PSStack) error {
 	}
 
 	if n.Val > len(*stack)-1 {
+		panic(ErrStackUnderflow)
 		return ErrStackUnderflow
 	}
 
@@ -1203,6 +1204,7 @@ func (this *PSOperand) Roll(stack *PSStack) error {
 		return nil
 	}
 	if n.Val > len(*stack) {
+		panic(ErrStackUnderflow)
 		return ErrStackUnderflow
 	}
 

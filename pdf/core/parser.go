@@ -43,6 +43,7 @@ type PdfParser struct {
 
 	rs               io.ReadSeeker
 	reader           *bufio.Reader
+	fileSize         int64
 	xrefs            XrefTable
 	objstms          ObjectStreams
 	trailer          *PdfObjectDictionary
@@ -611,7 +612,7 @@ func (this *PdfParser) ParseDict() (*PdfObjectDictionary, error) {
 		keyName, err := this.parseName()
 		common.Log.Trace("Key: %s", keyName)
 		if err != nil {
-			common.Log.Error("Could not parse name err=%#v", err)
+			common.Log.Error("Could not parse name. err=%v", err)
 			return nil, err
 		}
 
@@ -620,7 +621,7 @@ func (this *PdfParser) ParseDict() (*PdfObjectDictionary, error) {
 			// space.  For example "\Boundsnull"
 			newKey := keyName[0 : len(keyName)-4]
 			common.Log.Debug("Taking care of null bug (%s)", keyName)
-			common.Log.Debug("New key %q = null", newKey)
+			common.Log.Debug("New key \"%s\" = null", newKey)
 			this.skipSpaces()
 			bb, _ := this.reader.Peek(1)
 			if bb[0] == '/' {
@@ -640,7 +641,6 @@ func (this *PdfParser) ParseDict() (*PdfObjectDictionary, error) {
 		common.Log.Trace("dict[%s] = %s", keyName, val.String())
 	}
 	common.Log.Trace("returning PDF Dict!")
-
 
 	return dict, nil
 }
@@ -676,7 +676,6 @@ func (this *PdfParser) parsePdfVersion() (int, int, error) {
 		return 0, 0, err
 	}
 
-	//version, _ := strconv.Atoi(result1[1])
 	common.Log.Debug("Pdf version %d.%d", majorVersion, minorVersion)
 
 	return int(majorVersion), int(minorVersion), nil
@@ -851,7 +850,6 @@ func (this *PdfParser) parseXrefStream(xstm *PdfObjectInteger) (*PdfObjectDictio
 		common.Log.Debug("ERROR: Unable to decode stream: %v", err)
 		return nil, err
 	}
-	common.Log.Debug("@@ ds=%d %T %+v\n", len(ds), ds, ds)
 
 	s0 := int(b[0])
 	s1 := int(b[0] + b[1])
@@ -877,23 +875,29 @@ func (this *PdfParser) parseXrefStream(xstm *PdfObjectInteger) (*PdfObjectDictio
 	indexList := []int{}
 	if indexObj != nil {
 		common.Log.Trace("Index: %b", indexObj)
-		indices, ok := indexObj.(*PdfObjectArray)
+		indicesArray, ok := indexObj.(*PdfObjectArray)
 		if !ok {
 			common.Log.Debug("Invalid Index object (should be an array)")
 			return nil, errors.New("Invalid Index object")
 		}
 
 		// Expect indLen to be a multiple of 2.
-		if len(*indices)%2 != 0 {
+		if len(*indicesArray)%2 != 0 {
 			common.Log.Debug("WARNING Failure loading xref stm index not multiple of 2.")
 			return nil, errors.New("Range check error")
 		}
 
 		objCount = 0
-		for i := 0; i < len(*indices); i += 2 {
+		indices, err := indicesArray.ToIntegerArray()
+		if err != nil {
+			common.Log.Debug("Error getting index array as integers: %v", err)
+			return nil, err
+		}
+		for i := 0; i < len(indices); i += 2 {
 			// add the indices to the list..
-			startIdx := int(*(*indices)[i].(*PdfObjectInteger))
-			numObjs := int(*(*indices)[i+1].(*PdfObjectInteger))
+
+			startIdx := indices[i]
+			numObjs := indices[i+1]
 			for j := 0; j < numObjs; j++ {
 				indexList = append(indexList, startIdx+j)
 			}
@@ -936,8 +940,23 @@ func (this *PdfParser) parseXrefStream(xstm *PdfObjectInteger) (*PdfObjectDictio
 	common.Log.Trace("Decoded stream length: %d", len(ds))
 	objIndex := 0
 	for i := 0; i < len(ds); i += deltab {
+		err := checkBounds(len(ds), i, i+s0)
+		if err != nil {
+			common.Log.Debug("Invalid slice range: %v", err)
+			return nil, err
+		}
 		p1 := ds[i : i+s0]
+		err = checkBounds(len(ds), i+s0, i+s1)
+		if err != nil {
+			common.Log.Debug("Invalid slice range: %v", err)
+			return nil, err
+		}
 		p2 := ds[i+s0 : i+s1]
+		err = checkBounds(len(ds), i+s1, i+s2)
+		if err != nil {
+			common.Log.Debug("Invalid slice range: %v", err)
+			return nil, err
+		}
 		p3 := ds[i+s1 : i+s2]
 		ftype := convertBytes(p1)
 		n2 := convertBytes(p2)
@@ -949,6 +968,10 @@ func (this *PdfParser) parseXrefStream(xstm *PdfObjectInteger) (*PdfObjectDictio
 			ftype = 1
 		}
 
+		if objIndex >= len(indexList) {
+			common.Log.Debug("XRef stream - Trying to access index out of bounds - breaking")
+			break
+		}
 		objNum := indexList[objIndex]
 		objIndex++
 
@@ -1105,6 +1128,7 @@ func (this *PdfParser) loadXrefs() (*PdfObjectDictionary, error) {
 		return nil, err
 	}
 	common.Log.Trace("fsize: %d", fSize)
+	this.fileSize = fSize
 
 	// Seek the EOF marker.
 	err = this.seekToEOFMarker(fSize)
@@ -1414,6 +1438,11 @@ func (this *PdfParser) ParseIndirectObject() (PdfObject, error) {
 						dict.Set("Length", MakeInteger(newLength))
 					}
 
+					// Make sure is less than actual file size.
+					if int64(streamLength) > this.fileSize {
+						common.Log.Debug("ERROR: Stream length cannot be larger than file size")
+						return nil, errors.New("Invalid stream length, larger than file size")
+					}
 					stream := make([]byte, streamLength)
 					_, err = this.ReadAtLeast(stream, int(streamLength))
 					if err != nil {
@@ -1422,7 +1451,7 @@ func (this *PdfParser) ParseIndirectObject() (PdfObject, error) {
 						return nil, err
 					}
 
-					streamobj := PdfObjectStream{} // !@#$
+					streamobj := PdfObjectStream{}
 					streamobj.Stream = stream
 					streamobj.PdfObjectDictionary = indirect.PdfObject.(*PdfObjectDictionary)
 					streamobj.ObjectNumber = indirect.ObjectNumber
@@ -1454,6 +1483,7 @@ func NewParserFromString(txt string) *PdfParser {
 	bufferedReader := bufio.NewReader(bufReader)
 	parser.reader = bufferedReader
 
+	parser.fileSize = int64(len(txt))
 	return &parser
 }
 
