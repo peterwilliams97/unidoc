@@ -161,12 +161,12 @@ func (this *ContentStreamInlineImage) GetColorSpace(resources *PdfPageResources)
 		common.Log.Debug("Error: Invalid object type")
 		return nil, errors.New("Invalid type")
 	}
-
-	if *name == "G" {
+	// !@#$ switch
+	if *name == "G" || *name == "DeviceGray" {
 		return NewPdfColorspaceDeviceGray(), nil
-	} else if *name == "RGB" {
+	} else if *name == "RGB" || *name == "DeviceRGB" {
 		return NewPdfColorspaceDeviceRGB(), nil
-	} else if *name == "CMYK" {
+	} else if *name == "CMYK" || *name == "DeviceCMYK" {
 		return NewPdfColorspaceDeviceCMYK(), nil
 	} else if *name == "I" {
 		return nil, errors.New("Unsupported Index colorspace")
@@ -186,7 +186,6 @@ func (this *ContentStreamInlineImage) GetColorSpace(resources *PdfPageResources)
 
 		return cs, nil
 	}
-
 }
 
 func (this *ContentStreamInlineImage) GetEncoder() (StreamEncoder, error) {
@@ -322,6 +321,7 @@ func (this *ContentStreamParser) ParseInlineImage() (*ContentStreamInlineImage, 
 				return nil, fmt.Errorf("Not expecting an operand")
 			}
 
+			// !@#$ switch
 			if *param == "BPC" {
 				im.BitsPerComponent = valueObj
 			} else if *param == "CS" {
