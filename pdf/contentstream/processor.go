@@ -298,16 +298,16 @@ func (this *ContentStreamProcessor) Process(resources *PdfPageResources) error {
 // CS: Set the current color space for stroking operations.
 func (csp *ContentStreamProcessor) handleCommand_CS(op *ContentStreamOperation, resources *PdfPageResources) error {
 	if len(op.Params) < 1 {
-		common.Log.Debug("Invalid cs command, skipping over")
+		common.Log.Error("Invalid cs command, skipping over")
 		return errors.New("Too few parameters")
 	}
 	if len(op.Params) > 1 {
-		common.Log.Debug("cs command with too many parameters - continuing")
+		common.Log.Error("cs command with too many parameters - continuing")
 		return errors.New("Too many parameters")
 	}
 	name, ok := op.Params[0].(*PdfObjectName)
 	if !ok {
-		common.Log.Debug("ERROR: cs command with invalid parameter, skipping over")
+		common.Log.Error("cs command with invalid parameter, skipping over")
 		return errors.New("Type check error")
 	}
 	// Set the current color space to use for stroking operations.
@@ -323,6 +323,8 @@ func (csp *ContentStreamProcessor) handleCommand_CS(op *ContentStreamOperation, 
 	if err != nil {
 		return err
 	}
+
+	common.Log.Info("@3 %#v->%#v", csp.graphicsState.ColorStroking, color)
 	csp.graphicsState.ColorStroking = color
 
 	return nil
@@ -330,6 +332,7 @@ func (csp *ContentStreamProcessor) handleCommand_CS(op *ContentStreamOperation, 
 
 // cs: Set the current color space for non-stroking operations.
 func (csp *ContentStreamProcessor) handleCommand_cs(op *ContentStreamOperation, resources *PdfPageResources) error {
+
 	if len(op.Params) < 1 {
 		common.Log.Debug("Invalid CS command, skipping over")
 		return errors.New("Too few parameters")
@@ -340,9 +343,10 @@ func (csp *ContentStreamProcessor) handleCommand_cs(op *ContentStreamOperation, 
 	}
 	name, ok := op.Params[0].(*PdfObjectName)
 	if !ok {
-		common.Log.Debug("ERROR: CS command with invalid parameter, skipping over")
+		common.Log.Error("CS command with invalid parameter, skipping over")
 		return errors.New("Type check error")
 	}
+	common.Log.Info("handleCommand_cs: op=%#v name=%#v", op, *name)
 	// Set the current color space to use for non-stroking operations.
 	// Either device based or referring to resource dict.
 	cs, err := csp.getColorspace(string(*name), resources)
@@ -357,6 +361,7 @@ func (csp *ContentStreamProcessor) handleCommand_cs(op *ContentStreamOperation, 
 		return err
 	}
 	csp.graphicsState.ColorNonStroking = color
+	common.Log.Info("handleCommand_cs: cs=%#v color=%#v", cs, color)
 
 	return nil
 }
@@ -378,6 +383,7 @@ func (this *ContentStreamProcessor) handleCommand_SC(op *ContentStreamOperation,
 		return err
 	}
 
+	common.Log.Info("@4 %s->%s", this.graphicsState.ColorStroking, color)
 	this.graphicsState.ColorStroking = color
 	return nil
 }
@@ -405,7 +411,7 @@ func (this *ContentStreamProcessor) handleCommand_SCN(op *ContentStreamOperation
 	}
 
 	this.graphicsState.ColorStroking = color
-
+	common.Log.Info("@5 %#v->%#v", this.graphicsState.ColorStroking, color)
 	return nil
 }
 
@@ -551,6 +557,7 @@ func (this *ContentStreamProcessor) handleCommand_K(op *ContentStreamOperation, 
 		return err
 	}
 
+	common.Log.Info("@1 %s:%s->%s:%s", this.graphicsState.ColorspaceStroking, this.graphicsState.ColorStroking, cs, color)
 	this.graphicsState.ColorspaceStroking = cs
 	this.graphicsState.ColorStroking = color
 
@@ -571,6 +578,7 @@ func (this *ContentStreamProcessor) handleCommand_k(op *ContentStreamOperation, 
 		return err
 	}
 
+	common.Log.Info("@2 %s:%s->%s:%s", this.graphicsState.ColorspaceNonStroking, this.graphicsState.ColorNonStroking, cs, color)
 	this.graphicsState.ColorspaceNonStroking = cs
 	this.graphicsState.ColorNonStroking = color
 

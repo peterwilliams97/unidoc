@@ -152,7 +152,7 @@ func newFlateEncoderFromStream(streamObj *PdfObjectStream, decodeParams *PdfObje
 		if obj != nil {
 			dp, isDict := obj.(*PdfObjectDictionary)
 			if !isDict {
-				common.Log.Debug("Error: DecodeParms not a dictionary (%T)", obj)
+				common.Log.Error("DecodeParms not a dictionary (%T)", obj)
 				return nil, fmt.Errorf("Invalid DecodeParms")
 			}
 			decodeParams = dp
@@ -519,12 +519,19 @@ func newLZWEncoderFromStream(streamObj *PdfObjectStream, decodeParams *PdfObject
 	if decodeParams == nil {
 		obj := encDict.Get("DecodeParms")
 		if obj != nil {
-			dp, isDict := obj.(*PdfObjectDictionary)
-			if !isDict {
-				common.Log.Debug("Error: DecodeParms not a dictionary (%T)", obj)
+			if dp, isDict := obj.(*PdfObjectDictionary); isDict {
+				decodeParams = dp
+			} else if a, isArr := obj.(*PdfObjectArray); isArr {
+				if len(*a) == 1 {
+					if dp, isDict := (*a)[0].(*PdfObjectDictionary); isDict {
+						decodeParams = dp
+					}
+				}
+			}
+			if decodeParams == nil {
+				common.Log.Error("DecodeParms not a dictionary %#v", obj)
 				return nil, fmt.Errorf("Invalid DecodeParms")
 			}
-			decodeParams = dp
 		}
 	}
 
@@ -622,6 +629,7 @@ func (this *LZWEncoder) DecodeBytes(encoded []byte) ([]byte, error) {
 
 	_, err := outBuf.ReadFrom(r)
 	if err != nil {
+		common.Log.Error("DecodeBytes: ReadFrom failed. err=%v", err)
 		return nil, err
 	}
 

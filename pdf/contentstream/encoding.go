@@ -86,7 +86,7 @@ func newFlateEncoderFromInlineImage(inlineImage *ContentStreamInlineImage, decod
 		if obj != nil {
 			dp, isDict := obj.(*PdfObjectDictionary)
 			if !isDict {
-				common.Log.Debug("Error: DecodeParms not a dictionary (%T)", obj)
+				common.Log.Error("DecodeParms not a dictionary (%T)", obj)
 				return nil, fmt.Errorf("Invalid DecodeParms")
 			}
 			decodeParams = dp
@@ -161,7 +161,7 @@ func newLZWEncoderFromInlineImage(inlineImage *ContentStreamInlineImage, decodeP
 		if inlineImage.DecodeParms != nil {
 			dp, isDict := inlineImage.DecodeParms.(*PdfObjectDictionary)
 			if !isDict {
-				common.Log.Debug("Error: DecodeParms not a dictionary (%T)", inlineImage.DecodeParms)
+				common.Log.Error("DecodeParms not a dictionary (%T)", inlineImage.DecodeParms)
 				return nil, fmt.Errorf("Invalid DecodeParms")
 			}
 			decodeParams = dp
