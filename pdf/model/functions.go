@@ -317,7 +317,7 @@ func (this *PdfFunctionType0) Evaluate(x []float64) ([]float64, error) {
 		// from the nearest surrounding values in the sample table.
 
 		// Initial implementation is simply nearest neighbour.
-		// Then will add the linear and possibly bicubic/spline.
+		// Then we will add the linear and possibly bicubic/spline.
 		index := int(math.Floor(eip + 0.5))
 		if index < 0 {
 			index = 0
@@ -325,7 +325,6 @@ func (this *PdfFunctionType0) Evaluate(x []float64) ([]float64, error) {
 			index = this.Size[i] - 1
 		}
 		indices = append(indices, index)
-
 	}
 
 	// Calculate the index

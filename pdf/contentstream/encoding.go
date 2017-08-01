@@ -28,7 +28,9 @@ func newEncoderFromInlineImage(inlineImage *ContentStreamInlineImage) (StreamEnc
 	if !ok {
 		array, ok := inlineImage.Filter.(*PdfObjectArray)
 		if !ok {
-			return nil, fmt.Errorf("Filter not a Name or Array object")
+			err := errors.New("Filter not a Name or Array object")
+			common.Log.Error("newEncoderFromInlineImage: Filter=%#v err=%v", inlineImage.Filter, err)
+			return nil, err
 		}
 		if len(*array) == 0 {
 			// Empty array -> indicates raw filter (no filter).

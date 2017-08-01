@@ -314,21 +314,21 @@ func (r *PdfPageResources) GetXObjectByName(keyName PdfObjectName) (*PdfObjectSt
 
 	xresDict, has := TraceToDirectObject(r.XObject).(*PdfObjectDictionary)
 	if !has {
-		common.Log.Debug("ERROR: XObject not a dictionary! (got %T)", TraceToDirectObject(r.XObject))
+		common.Log.Error("XObject not a dictionary! (got %T)", TraceToDirectObject(r.XObject))
 		return nil, XObjectTypeUndefined
 	}
 
 	if obj := xresDict.Get(keyName); obj != nil {
 		stream, ok := obj.(*PdfObjectStream)
 		if !ok {
-			common.Log.Debug("XObject not pointing to a stream %T", obj)
+			common.Log.Error("XObject not pointing to a stream %T", obj)
 			return nil, XObjectTypeUndefined
 		}
 		dict := stream.PdfObjectDictionary
 
-		name, ok := dict.Get("Subtype").(*PdfObjectName)
+		name, ok := TraceToDirectObject(dict.Get("Subtype")).(*PdfObjectName)
 		if !ok {
-			common.Log.Debug("XObject Subtype not a Name, dict: %s", dict.String())
+			common.Log.Error("XObject Subtype not a Name, dict: %s", dict.String())
 			return nil, XObjectTypeUndefined
 		}
 
@@ -339,7 +339,7 @@ func (r *PdfPageResources) GetXObjectByName(keyName PdfObjectName) (*PdfObjectSt
 		} else if *name == "PS" {
 			return stream, XObjectTypePS
 		} else {
-			common.Log.Debug("XObject Subtype not known (%s)", *name)
+			common.Log.Error("XObject Subtype not known (%s)", *name)
 			return nil, XObjectTypeUndefined
 		}
 	} else {

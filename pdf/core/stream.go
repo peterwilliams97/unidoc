@@ -14,7 +14,7 @@ import (
 
 // NewEncoderFromStream creates an encoder from `streamObj`'s dictionary.
 func NewEncoderFromStream(streamObj *PdfObjectStream) (StreamEncoder, error) {
-	filterObj := streamObj.PdfObjectDictionary.Get("Filter")
+	filterObj := TraceToDirectObject(streamObj.PdfObjectDictionary.Get("Filter"))
 	if filterObj == nil {
 		// No filter, return raw data back.
 		return NewRawEncoder(), nil
@@ -30,7 +30,9 @@ func NewEncoderFromStream(streamObj *PdfObjectStream) (StreamEncoder, error) {
 	if !ok {
 		array, ok := filterObj.(*PdfObjectArray)
 		if !ok {
-			return nil, errors.New("Filter not a Name or Array object")
+			err := errors.New("Filter not a Name or Array object")
+			common.Log.Error("NewEncoderFromStream: Filter=%#v err=%v", filterObj, err)
+			return nil, err
 		}
 		if len(*array) == 0 {
 			// Empty array -> indicates raw filter (no filter).

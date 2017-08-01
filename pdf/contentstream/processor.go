@@ -218,61 +218,73 @@ func (this *ContentStreamProcessor) Process(resources *PdfPageResources) error {
 		case "CS":
 			err := this.handleCommand_CS(op, resources)
 			if err != nil {
+				common.Log.Error("err=%v", err)
 				return err
 			}
 		case "cs":
 			err := this.handleCommand_cs(op, resources)
 			if err != nil {
+				common.Log.Error("err=%v", err)
 				return err
 			}
 		case "SC":
 			err := this.handleCommand_SC(op, resources)
 			if err != nil {
+				common.Log.Error("err=%v", err)
 				return err
 			}
 		case "SCN":
 			err := this.handleCommand_SCN(op, resources)
 			if err != nil {
+				common.Log.Error("err=%v", err)
 				return err
 			}
 		case "sc":
 			err := this.handleCommand_sc(op, resources)
 			if err != nil {
+				common.Log.Error("err=%v", err)
 				return err
 			}
 		case "scn":
 			err := this.handleCommand_scn(op, resources)
 			if err != nil {
+				common.Log.Error("err=%v", err)
 				return err
 			}
 		case "G":
 			err := this.handleCommand_G(op, resources)
 			if err != nil {
+				common.Log.Error("err=%v", err)
 				return err
 			}
 		case "g":
 			err := this.handleCommand_g(op, resources)
 			if err != nil {
+				common.Log.Error("err=%v", err)
 				return err
 			}
 		case "RG":
 			err := this.handleCommand_RG(op, resources)
 			if err != nil {
+				common.Log.Error("err=%v", err)
 				return err
 			}
 		case "rg":
 			err := this.handleCommand_rg(op, resources)
 			if err != nil {
+				common.Log.Error("err=%v", err)
 				return err
 			}
 		case "K":
 			err := this.handleCommand_K(op, resources)
 			if err != nil {
+				common.Log.Error("err=%v", err)
 				return err
 			}
 		case "k":
 			err := this.handleCommand_k(op, resources)
 			if err != nil {
+				common.Log.Error("err=%v", err)
 				return err
 			}
 		}
@@ -314,6 +326,7 @@ func (csp *ContentStreamProcessor) handleCommand_CS(op *ContentStreamOperation, 
 	// Either device based or referring to resource dict.
 	cs, err := csp.getColorspace(string(*name), resources)
 	if err != nil {
+		common.Log.Error("err=%v", err)
 		return err
 	}
 	csp.graphicsState.ColorspaceStroking = cs
@@ -321,10 +334,11 @@ func (csp *ContentStreamProcessor) handleCommand_CS(op *ContentStreamOperation, 
 	// Set initial color.
 	color, err := csp.getInitialColor(cs)
 	if err != nil {
+		common.Log.Error("err=%v", err)
 		return err
 	}
 
-	common.Log.Info("@3 %#v->%#v", csp.graphicsState.ColorStroking, color)
+	// common.Log.Info("@3 %#v->%#v", csp.graphicsState.ColorStroking, color)
 	csp.graphicsState.ColorStroking = color
 
 	return nil
@@ -332,7 +346,7 @@ func (csp *ContentStreamProcessor) handleCommand_CS(op *ContentStreamOperation, 
 
 // cs: Set the current color space for non-stroking operations.
 func (csp *ContentStreamProcessor) handleCommand_cs(op *ContentStreamOperation, resources *PdfPageResources) error {
-
+	// common.Log.Info("!!#handleCommand_cs: op=%#v", op)
 	if len(op.Params) < 1 {
 		common.Log.Debug("Invalid CS command, skipping over")
 		return errors.New("Too few parameters")
@@ -346,7 +360,7 @@ func (csp *ContentStreamProcessor) handleCommand_cs(op *ContentStreamOperation, 
 		common.Log.Error("CS command with invalid parameter, skipping over")
 		return errors.New("Type check error")
 	}
-	common.Log.Info("handleCommand_cs: op=%#v name=%#v", op, *name)
+	// common.Log.Info("handleCommand_cs: op=%#v name=%#v", op, *name)
 	// Set the current color space to use for non-stroking operations.
 	// Either device based or referring to resource dict.
 	cs, err := csp.getColorspace(string(*name), resources)
@@ -361,7 +375,8 @@ func (csp *ContentStreamProcessor) handleCommand_cs(op *ContentStreamOperation, 
 		return err
 	}
 	csp.graphicsState.ColorNonStroking = color
-	common.Log.Info("handleCommand_cs: cs=%#v color=%#v", cs, color)
+	// common.Log.Info("!!@handleCommand_cs: ColorNonStroking=%#v color=%#v",
+	// 	csp.graphicsState.ColorNonStroking, color)
 
 	return nil
 }
@@ -383,7 +398,7 @@ func (this *ContentStreamProcessor) handleCommand_SC(op *ContentStreamOperation,
 		return err
 	}
 
-	common.Log.Info("@4 %s->%s", this.graphicsState.ColorStroking, color)
+	// common.Log.Info("@4 %s->%s", this.graphicsState.ColorStroking, color)
 	this.graphicsState.ColorStroking = color
 	return nil
 }
@@ -411,7 +426,7 @@ func (this *ContentStreamProcessor) handleCommand_SCN(op *ContentStreamOperation
 	}
 
 	this.graphicsState.ColorStroking = color
-	common.Log.Info("@5 %#v->%#v", this.graphicsState.ColorStroking, color)
+	// common.Log.Info("@5 %#v->%#v", this.graphicsState.ColorStroking, color)
 	return nil
 }
 
@@ -419,9 +434,11 @@ func (this *ContentStreamProcessor) handleCommand_SCN(op *ContentStreamOperation
 func (this *ContentStreamProcessor) handleCommand_sc(op *ContentStreamOperation, resources *PdfPageResources) error {
 	cs := this.graphicsState.ColorspaceNonStroking
 
+	// common.Log.Info("!!$handleCommand_sc: op=%#v cs=%#v", op, this.graphicsState.ColorspaceNonStroking)
+
 	if !isPatternCS(cs) {
 		if len(op.Params) != cs.GetNumComponents() {
-			common.Log.Error("Invalid number of parameters for SC")
+			common.Log.Error("Invalid number of parameters for sc")
 			common.Log.Error("Number %d not matching colorspace %T", len(op.Params), cs)
 			return errors.New("Invalid number of parameters")
 		}
@@ -429,6 +446,7 @@ func (this *ContentStreamProcessor) handleCommand_sc(op *ContentStreamOperation,
 
 	color, err := cs.ColorFromPdfObjects(op.Params)
 	if err != nil {
+		common.Log.Error("ColorFromPdfObjects failed: cs=%T=%s, err=%v", cs, cs, err)
 		return err
 	}
 
@@ -440,6 +458,7 @@ func (this *ContentStreamProcessor) handleCommand_sc(op *ContentStreamOperation,
 // scn: Same as SCN except used for non-stroking operations.
 func (this *ContentStreamProcessor) handleCommand_scn(op *ContentStreamOperation, resources *PdfPageResources) error {
 	cs := this.graphicsState.ColorspaceNonStroking
+	// common.Log.Info("!!$handleCommand_scn: op=%s cs=%#v", op, this.graphicsState.ColorspaceNonStroking)
 
 	if !isPatternCS(cs) {
 		if len(op.Params) != cs.GetNumComponents() {
@@ -455,6 +474,8 @@ func (this *ContentStreamProcessor) handleCommand_scn(op *ContentStreamOperation
 	}
 
 	this.graphicsState.ColorNonStroking = color
+	// common.Log.Info("!!^handleCommand_scn: color=%#v cs=%#v", color, this.graphicsState.ColorspaceNonStroking)
+	// panic("scn")
 
 	return nil
 }
@@ -557,7 +578,7 @@ func (this *ContentStreamProcessor) handleCommand_K(op *ContentStreamOperation, 
 		return err
 	}
 
-	common.Log.Info("@1 %s:%s->%s:%s", this.graphicsState.ColorspaceStroking, this.graphicsState.ColorStroking, cs, color)
+	// common.Log.Info("@1 %s:%s->%s:%s", this.graphicsState.ColorspaceStroking, this.graphicsState.ColorStroking, cs, color)
 	this.graphicsState.ColorspaceStroking = cs
 	this.graphicsState.ColorStroking = color
 
@@ -578,7 +599,7 @@ func (this *ContentStreamProcessor) handleCommand_k(op *ContentStreamOperation, 
 		return err
 	}
 
-	common.Log.Info("@2 %s:%s->%s:%s", this.graphicsState.ColorspaceNonStroking, this.graphicsState.ColorNonStroking, cs, color)
+	// common.Log.Info("@2 %s:%s->%s:%s", this.graphicsState.ColorspaceNonStroking, this.graphicsState.ColorNonStroking, cs, color)
 	this.graphicsState.ColorspaceNonStroking = cs
 	this.graphicsState.ColorNonStroking = color
 

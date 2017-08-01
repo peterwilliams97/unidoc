@@ -423,9 +423,7 @@ func (this *PdfColorspaceDeviceRGB) ImageToGray(img Image) (Image, error) {
 
 		// Convert to uint32
 		val := uint32(grayValue * maxVal)
-
 		graySamples = append(graySamples, val)
-
 	}
 	grayImage.SetSamples(graySamples)
 	grayImage.ColorComponents = 1
@@ -443,10 +441,12 @@ func (this *PdfColorspaceDeviceRGB) IsImageColored(img Image) bool {
 		r := float64(samples[i]) / maxVal
 		g := float64(samples[i+1]) / maxVal
 		b := float64(samples[i+2]) / maxVal
-		if r != g || g != b {
+		if visible(r-g) || visible(g-b) {
+			common.Log.Info("PdfColorspaceDeviceRGB.IsImageColored: i=%d rgb=%.3f %.3f %.3f", i, r, g, b)
 			return true
 		}
 	}
+	common.Log.Info("PdfColorspaceDeviceRGB.IsImageColored: No color")
 	return false
 }
 
@@ -748,6 +748,7 @@ func newPdfColorspaceCalGrayFromPdfObject(obj PdfObject) (*PdfColorspaceCalGray,
 	}
 	whitePoint, err := whitePointArray.GetAsFloat64Slice()
 	if err != nil {
+		common.Log.Error("err=%v", err)
 		return nil, err
 	}
 	cs.WhitePoint = whitePoint
@@ -765,6 +766,7 @@ func newPdfColorspaceCalGrayFromPdfObject(obj PdfObject) (*PdfColorspaceCalGray,
 		}
 		blackPoint, err := blackPointArray.GetAsFloat64Slice()
 		if err != nil {
+			common.Log.Error("err=%v", err)
 			return nil, err
 		}
 		cs.BlackPoint = blackPoint
@@ -828,12 +830,14 @@ func (this *PdfColorspaceCalGray) ColorFromFloats(vals []float64) (PdfColor, err
 }
 
 func (this *PdfColorspaceCalGray) ColorFromPdfObjects(objects []PdfObject) (PdfColor, error) {
-	if len(objects) != 4 {
+	if len(objects) != 1 {
+		common.Log.Error("len(objects)=%d. Should be 1. objects=%#v", len(objects), objects)
 		return nil, errors.New("Range check")
 	}
 
 	floats, err := getNumbersAsFloat(objects)
 	if err != nil {
+		common.Log.Error("err=%v", err)
 		return nil, err
 	}
 
@@ -2176,6 +2180,9 @@ func newPdfColorspaceSpecialIndexedFromPdfObject(obj PdfObject) (*PdfColorspaceS
 
 	cs.colorLookup = data
 
+	// common.Log.Error("cs=%#v", cs)
+	// panic("indexed")
+
 	return cs, nil
 }
 
@@ -2218,6 +2225,8 @@ func (this *PdfColorspaceSpecialIndexed) ColorFromPdfObjects(objects []PdfObject
 }
 
 func (this *PdfColorspaceSpecialIndexed) ColorToRGB(color PdfColor) (PdfColor, error) {
+	common.Log.Error("PdfColorspaceSpecialIndexed.ColorToRGB: color=%#v", color)
+	panic("indexed2")
 	if this.Base == nil {
 		return nil, errors.New("Indexed base colorspace undefined")
 	}
@@ -2247,7 +2256,10 @@ func (this *PdfColorspaceSpecialIndexed) ImageToRGB(img Image) (Image, error) {
 		}
 
 		cvals := this.colorLookup[index : index+N]
-		common.Log.Trace("C Vals: % d", cvals)
+		// common.Log.Info("C Vals: % d", cvals)
+		// if cvals[0] != cvals[1] || cvals[1] != cvals[2] {
+		// 	panic("@@ color")
+		// }
 		for _, val := range cvals {
 			baseSamples = append(baseSamples, uint32(val))
 		}
@@ -2416,6 +2428,19 @@ func (this *PdfColorspaceSpecialSeparation) ColorFromPdfObjects(objects []PdfObj
 }
 
 func (this *PdfColorspaceSpecialSeparation) ColorToRGB(color PdfColor) (PdfColor, error) {
+	// common.Log.Info("!!!ColorToRGB: color=%#v", color)
+	// color, err := this.ColorFromFloats(color.GetVals())
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// colr, err := this.TintTransform.Evaluate(color.Get)
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	// if rgbColor, ok := color.(*PdfColorDeviceRGB); ok {
+	// 	return rgbColor, nil
+	// }
 	if this.AlternateSpace == nil {
 		return nil, errors.New("Alternate colorspace undefined")
 	}
