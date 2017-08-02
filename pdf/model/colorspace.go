@@ -289,14 +289,8 @@ func (this *PdfColorDeviceRGB) GetNumComponents() int {
 	return 3
 }
 
-const colTol = 0.5 / 255.0
-
-func visible(x float64) bool {
-	return math.Abs(x) > colTol
-}
-
 func (this *PdfColorDeviceRGB) IsColored() bool {
-	return visible(this[0]-this[1]) || visible(this[1]-this[2])
+	return visible(this[0]-this[1], this[0]-this[2], this[1]-this[2])
 }
 
 func (this *PdfColorDeviceRGB) R() float64 {
@@ -441,12 +435,10 @@ func (this *PdfColorspaceDeviceRGB) IsImageColored(img Image) bool {
 		r := float64(samples[i]) / maxVal
 		g := float64(samples[i+1]) / maxVal
 		b := float64(samples[i+2]) / maxVal
-		if visible(r-g) || visible(g-b) {
-			common.Log.Info("PdfColorspaceDeviceRGB.IsImageColored: i=%d rgb=%.3f %.3f %.3f", i, r, g, b)
+		if visible(r-g, r-b, g-b) {
 			return true
 		}
 	}
-	common.Log.Info("PdfColorspaceDeviceRGB.IsImageColored: No color")
 	return false
 }
 
@@ -468,7 +460,7 @@ func (this *PdfColorDeviceCMYK) GetNumComponents() int {
 }
 
 func (this *PdfColorDeviceCMYK) IsColored() bool {
-	return visible(this[0]-this[1]) || visible(this[1]-this[2])
+	return visible(this[0]-this[1], this[0]-this[2], this[1]-this[2])
 }
 
 func (this *PdfColorDeviceCMYK) C() float64 {
@@ -931,7 +923,7 @@ func (this *PdfColorCalRGB) GetNumComponents() int {
 }
 
 func (this *PdfColorCalRGB) IsColored() bool {
-	return visible(this[0]-this[1]) || visible(this[1]-this[2])
+	return visible(this[0]-this[1], this[0]-this[2], this[1]-this[2])
 }
 
 func (this *PdfColorCalRGB) A() float64 {
@@ -1263,7 +1255,7 @@ func (this *PdfColorLab) GetNumComponents() int {
 }
 
 func (this *PdfColorLab) IsColored() bool {
-	return visible(this[1]) || visible(this[2])
+	return visible(this[1], this[2])
 }
 
 func (this *PdfColorLab) L() float64 {
@@ -2756,4 +2748,19 @@ func (this *PdfColorspaceDeviceNAttributes) ToPdfObject() PdfObject {
 	}
 
 	return dict
+}
+
+// ColorTolerance is the smallest color component that is visible on a typical mid-range color laser printer
+// cpts have values in range 0.0-1.0
+const ColorTolerance = 0.5 / 255.0
+
+// visible returns true if any of color component `cpts` is visible on a typical mid-range color laser printer
+// cpts have values in range 0.0-1.0
+func visible(cpts ...float64) bool {
+	for _, x := range cpts {
+		if math.Abs(x) > ColorTolerance {
+			return true
+		}
+	}
+	return false
 }
