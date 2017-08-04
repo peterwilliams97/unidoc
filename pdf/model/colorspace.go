@@ -184,12 +184,14 @@ func (this *PdfColorspaceDeviceGray) String() string {
 
 func (this *PdfColorspaceDeviceGray) ColorFromFloats(vals []float64) (PdfColor, error) {
 	if len(vals) != 1 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
 	val := vals[0]
 
 	if val < 0.0 || val > 1.0 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
@@ -198,6 +200,7 @@ func (this *PdfColorspaceDeviceGray) ColorFromFloats(vals []float64) (PdfColor, 
 
 func (this *PdfColorspaceDeviceGray) ColorFromPdfObjects(objects []PdfObject) (PdfColor, error) {
 	if len(objects) != 1 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
@@ -311,24 +314,28 @@ func (this *PdfColorspaceDeviceRGB) ToPdfObject() PdfObject {
 
 func (this *PdfColorspaceDeviceRGB) ColorFromFloats(vals []float64) (PdfColor, error) {
 	if len(vals) != 3 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
 	// Red.
 	r := vals[0]
 	if r < 0.0 || r > 1.0 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
 	// Green.
 	g := vals[1]
 	if g < 0.0 || g > 1.0 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
 	// Blue.
 	b := vals[2]
 	if b < 0.0 || b > 1.0 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
@@ -340,6 +347,7 @@ func (this *PdfColorspaceDeviceRGB) ColorFromFloats(vals []float64) (PdfColor, e
 // Get the color from a series of pdf objects (3 for rgb).
 func (this *PdfColorspaceDeviceRGB) ColorFromPdfObjects(objects []PdfObject) (PdfColor, error) {
 	if len(objects) != 3 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
@@ -452,30 +460,35 @@ func (this *PdfColorspaceDeviceCMYK) ToPdfObject() PdfObject {
 
 func (this *PdfColorspaceDeviceCMYK) ColorFromFloats(vals []float64) (PdfColor, error) {
 	if len(vals) != 4 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
 	// Cyan
 	c := vals[0]
 	if c < 0.0 || c > 1.0 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
 	// Magenta
 	m := vals[1]
 	if m < 0.0 || m > 1.0 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
 	// Yellow.
 	y := vals[2]
 	if y < 0.0 || y > 1.0 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
 	// Key.
 	k := vals[3]
 	if k < 0.0 || k > 1.0 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
@@ -486,6 +499,7 @@ func (this *PdfColorspaceDeviceCMYK) ColorFromFloats(vals []float64) (PdfColor, 
 // Get the color from a series of pdf objects (4 for cmyk).
 func (this *PdfColorspaceDeviceCMYK) ColorFromPdfObjects(objects []PdfObject) (PdfColor, error) {
 	if len(objects) != 4 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
@@ -541,7 +555,7 @@ func (this *PdfColorspaceDeviceCMYK) ImageToRGB(img Image) (Image, error) {
 		decode = []float64{0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0}
 	}
 	if len(decode) != 8 {
-		common.Log.Debug("Invalid decode array (%d): % d", len(decode), decode)
+		common.Log.Debug("Invalid decode array (%d): % .3f", len(decode), decode)
 		return img, errors.New("Invalid decode array")
 	}
 	common.Log.Trace("Decode array: % f", decode)
@@ -747,11 +761,13 @@ func (this *PdfColorspaceCalGray) ToPdfObject() PdfObject {
 
 func (this *PdfColorspaceCalGray) ColorFromFloats(vals []float64) (PdfColor, error) {
 	if len(vals) != 1 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
 	val := vals[0]
 	if val < 0.0 || val > 1.0 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
@@ -761,6 +777,7 @@ func (this *PdfColorspaceCalGray) ColorFromFloats(vals []float64) (PdfColor, err
 
 func (this *PdfColorspaceCalGray) ColorFromPdfObjects(objects []PdfObject) (PdfColor, error) {
 	if len(objects) != 1 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
@@ -1056,24 +1073,28 @@ func (this *PdfColorspaceCalRGB) ToPdfObject() PdfObject {
 
 func (this *PdfColorspaceCalRGB) ColorFromFloats(vals []float64) (PdfColor, error) {
 	if len(vals) != 3 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
 	// A
 	a := vals[0]
 	if a < 0.0 || a > 1.0 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
 	// B
 	b := vals[1]
 	if b < 0.0 || b > 1.0 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
 	// C.
 	c := vals[2]
 	if c < 0.0 || c > 1.0 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
@@ -1083,6 +1104,7 @@ func (this *PdfColorspaceCalRGB) ColorFromFloats(vals []float64) (PdfColor, erro
 
 func (this *PdfColorspaceCalRGB) ColorFromPdfObjects(objects []PdfObject) (PdfColor, error) {
 	if len(objects) != 3 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
@@ -1359,24 +1381,28 @@ func (this *PdfColorspaceLab) ToPdfObject() PdfObject {
 
 func (this *PdfColorspaceLab) ColorFromFloats(vals []float64) (PdfColor, error) {
 	if len(vals) != 3 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
 	// L
 	l := vals[0]
 	if l < 0.0 || l > 1.0 {
+		common.Log.Debug("$$$$ %T l=%g", this, l)
 		return nil, errors.New("Range check")
 	}
 
 	// A
 	a := vals[1]
 	if a < 0.0 || a > 1.0 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
 	// B.
 	b := vals[2]
 	if b < 0.0 || b > 1.0 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
@@ -1386,6 +1412,7 @@ func (this *PdfColorspaceLab) ColorFromFloats(vals []float64) (PdfColor, error) 
 
 func (this *PdfColorspaceLab) ColorFromPdfObjects(objects []PdfObject) (PdfColor, error) {
 	if len(objects) != 3 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
@@ -1933,6 +1960,7 @@ func (this *PdfColorspaceSpecialPattern) ColorFromFloats(vals []float64) (PdfCol
 // The first objects (if present) represent the color in underlying colorspace.  The last one represents
 // the name of the pattern.
 func (this *PdfColorspaceSpecialPattern) ColorFromPdfObjects(objects []PdfObject) (PdfColor, error) {
+	common.Log.Error("@@@@ %T", this)
 	if len(objects) < 1 {
 		return nil, errors.New("Invalid number of parameters")
 	}
@@ -2104,6 +2132,7 @@ func newPdfColorspaceSpecialIndexedFromPdfObject(obj PdfObject) (*PdfColorspaceS
 
 func (this *PdfColorspaceSpecialIndexed) ColorFromFloats(vals []float64) (PdfColor, error) {
 	if len(vals) != 1 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
@@ -2129,6 +2158,7 @@ func (this *PdfColorspaceSpecialIndexed) ColorFromFloats(vals []float64) (PdfCol
 
 func (this *PdfColorspaceSpecialIndexed) ColorFromPdfObjects(objects []PdfObject) (PdfColor, error) {
 	if len(objects) != 1 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
@@ -2307,6 +2337,7 @@ func (this *PdfColorspaceSpecialSeparation) ToPdfObject() PdfObject {
 
 func (this *PdfColorspaceSpecialSeparation) ColorFromFloats(vals []float64) (PdfColor, error) {
 	if len(vals) != 1 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
@@ -2327,6 +2358,7 @@ func (this *PdfColorspaceSpecialSeparation) ColorFromFloats(vals []float64) (Pdf
 
 func (this *PdfColorspaceSpecialSeparation) ColorFromPdfObjects(objects []PdfObject) (PdfColor, error) {
 	if len(objects) != 1 {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
@@ -2505,6 +2537,7 @@ func (this *PdfColorspaceDeviceN) ToPdfObject() PdfObject {
 
 func (this *PdfColorspaceDeviceN) ColorFromFloats(vals []float64) (PdfColor, error) {
 	if len(vals) != this.GetNumComponents() {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 
@@ -2522,6 +2555,7 @@ func (this *PdfColorspaceDeviceN) ColorFromFloats(vals []float64) (PdfColor, err
 
 func (this *PdfColorspaceDeviceN) ColorFromPdfObjects(objects []PdfObject) (PdfColor, error) {
 	if len(objects) != this.GetNumComponents() {
+		common.Log.Debug("$$$$ %T", this)
 		return nil, errors.New("Range check")
 	}
 

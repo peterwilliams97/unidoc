@@ -15,15 +15,20 @@ import (
 	"github.com/unidoc/unidoc/common"
 )
 
+// TODO (v3): Create a new type xrefType which can be an integer and can be used for improved type checking.
+// TODO (v3): Unexport these constants and rename with camelCase.
 const (
-	XREF_TABLE_ENTRY   = iota
+	// XREF_TABLE_ENTRY indicates a normal xref table entry.
+	XREF_TABLE_ENTRY = iota
+
+	// XREF_OBJECT_STREAM indicates an xref entry in an xref object stream.
 	XREF_OBJECT_STREAM = iota
 )
 
-// Either can be in a normal xref table, or in an xref stream.
-// Can point either to a file offset, or to an object stream.
-// XrefFileOffset or XrefObjectStream...
-
+// XrefObject defines a cross reference entry which is a map between object number (with generation number) and the
+// location of the actual object, either as a file offset (xref table entry), or as a location within an xref
+// stream object (xref object stream).
+// TODO (v3): Unexport.
 type XrefObject struct {
 	xtype        int
 	objectNumber int
@@ -35,16 +40,26 @@ type XrefObject struct {
 	osObjIndex  int
 }
 
+// XrefTable is a map between object number and corresponding XrefObject.
+// TODO (v3): Unexport.
 type XrefTable map[int]XrefObject
 
+// ObjectStream represents an object stream's information which can contain multiple indirect objects.
+// The information specifies the number of objects and has information about offset locations for
+// each object.
+// TODO (v3): Unexport.
 type ObjectStream struct {
-	N       int
+	N       int // TODO (v3): Unexport.
 	ds      []byte
 	offsets map[int]int64
 }
 
+// ObjectStreams defines a map between object numbers (object streams only) and underlying ObjectStream information.
 type ObjectStreams map[int]ObjectStream
 
+// ObjectCache defines a map between object numbers and corresponding PdfObject. Serves as a cache for PdfObjects that
+// have already been parsed.
+// TODO (v3): Unexport.
 type ObjectCache map[int]PdfObject
 
 // Get an object from an object stream.
@@ -67,7 +82,7 @@ func (this *PdfParser) lookupObjectViaOS(sobjNumber int, objNum int) (PdfObject,
 		}
 
 		if this.crypter != nil && !this.crypter.isDecrypted(so) {
-			return nil, errors.New("Need to decrypt the stream !")
+			return nil, errors.New("Need to decrypt the stream")
 		}
 
 		sod := so.PdfObjectDictionary
@@ -109,7 +124,7 @@ func (this *PdfParser) lookupObjectViaOS(sobjNumber int, objNum int) (PdfObject,
 
 		common.Log.Trace("Parsing offset map")
 		// Load the offset map (relative to the beginning of the stream...)
-		var offsets map[int]int64 = make(map[int]int64)
+		offsets := map[int]int64{}
 		// Object list and offsets.
 		for i := 0; i < int(*N); i++ {
 			this.skipSpaces()
@@ -177,11 +192,10 @@ func (this *PdfParser) lookupObjectViaOS(sobjNumber int, objNum int) (PdfObject,
 	return &io, nil
 }
 
-// Currently a bit messy.. multiple wrappers.  Can we clean up?
-
-// Outside interface for lookupByNumberWrapper.  Default attempts
-// repairs of bad xref tables.
+// LookupByNumber looks up a PdfObject by object number.  Returns an error on failure.
+// TODO (v3): Unexport.
 func (this *PdfParser) LookupByNumber(objNumber int) (PdfObject, error) {
+	// Outside interface for lookupByNumberWrapper.  Default attempts repairs of bad xref tables.
 	obj, _, err := this.lookupByNumberWrapper(objNumber, true)
 	return obj, err
 }
@@ -313,13 +327,14 @@ func (this *PdfParser) lookupByNumber(objNumber int, attemptRepairs bool) (PdfOb
 	return nil, false, errors.New("Unknown xref type")
 }
 
-// LookupByReference
+// LookupByReference looks up a PdfObject by a reference.
 func (this *PdfParser) LookupByReference(ref PdfObjectReference) (PdfObject, error) {
 	common.Log.Trace("Looking up reference %s", ref.String())
 	return this.LookupByNumber(int(ref.ObjectNumber))
 }
 
-// Trace to direct object.
+// Trace traces a PdfObject to direct object, looking up and resolving references as needed (unlike TraceToDirect).
+// TODO (v3): Unexport.
 func (this *PdfParser) Trace(obj PdfObject) (PdfObject, error) {
 	ref, isRef := obj.(*PdfObjectReference)
 	if !isRef {

@@ -149,7 +149,8 @@ func newFlateEncoderFromStream(streamObj *PdfObjectStream, decodeParams *PdfObje
 
 	// If decodeParams not provided, see if we can get from the stream.
 	if decodeParams == nil {
-		obj := encDict.Get("DecodeParms")
+		// !@#$ /Users/pcadmin/go-work/src/trust-me/testdata/004635142b2089f675000000.pdf`
+		obj := TraceToDirectObject(encDict.Get("DecodeParms"))
 		if obj != nil {
 			dp, isDict := obj.(*PdfObjectDictionary)
 			if !isDict {
@@ -182,7 +183,7 @@ func newFlateEncoderFromStream(streamObj *PdfObjectStream, decodeParams *PdfObje
 	if obj != nil {
 		bpc, ok := obj.(*PdfObjectInteger)
 		if !ok {
-			common.Log.Debug("ERROR: Invalid BitsPerComponent")
+			common.Log.Debug("ERROR: Invalid BitsPerComponent. bpc=%#v", bpc)
 			return nil, fmt.Errorf("Invalid BitsPerComponent")
 		}
 		encoder.BitsPerComponent = int(*bpc)
@@ -245,7 +246,7 @@ func (this *FlateEncoder) DecodeStream(streamObj *PdfObjectStream) ([]byte, erro
 	common.Log.Trace("FlateDecode stream")
 	common.Log.Trace("Predictor: %d", this.Predictor)
 	if this.BitsPerComponent != 8 {
-		return nil, fmt.Errorf("Invalid BitsPerComponent (only 8 supported)")
+		return nil, fmt.Errorf("Invalid BitsPerComponent=%d (only 8 supported)", this.BitsPerComponent)
 	}
 
 	outData, err := this.DecodeBytes(streamObj.Stream)
@@ -688,6 +689,10 @@ func (this *LZWEncoder) DecodeStream(streamObj *PdfObjectStream) ([]byte, error)
 			rows := len(outData) / rowLength
 			if len(outData)%rowLength != 0 {
 				return nil, fmt.Errorf("Invalid row length (%d/%d)", len(outData), rowLength)
+			}
+			if rowLength > len(outData) {
+				common.Log.Trace("Row length cannot be longer than data length (%d/%d)", rowLength, len(outData))
+				return nil, errors.New("Range check error")
 			}
 
 			pOutBuffer := bytes.NewBuffer(nil)

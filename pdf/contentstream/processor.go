@@ -218,31 +218,37 @@ func (this *ContentStreamProcessor) Process(resources *PdfPageResources) error {
 		case "CS":
 			err := this.handleCommand_CS(op, resources)
 			if err != nil {
+				common.Log.Error("err=%v", err)
 				return err
 			}
 		case "cs":
 			err := this.handleCommand_cs(op, resources)
 			if err != nil {
+				common.Log.Error("err=%v", err)
 				return err
 			}
 		case "SC":
 			err := this.handleCommand_SC(op, resources)
 			if err != nil {
+				common.Log.Error("err=%v", err)
 				return err
 			}
 		case "SCN":
 			err := this.handleCommand_SCN(op, resources)
 			if err != nil {
+				common.Log.Error("err=%v", err)
 				return err
 			}
 		case "sc":
 			err := this.handleCommand_sc(op, resources)
 			if err != nil {
+				common.Log.Error("err=%v", err)
 				return err
 			}
 		case "scn":
 			err := this.handleCommand_scn(op, resources)
 			if err != nil {
+				common.Log.Error("err=%v", err)
 				return err
 			}
 		case "G":
@@ -253,26 +259,31 @@ func (this *ContentStreamProcessor) Process(resources *PdfPageResources) error {
 		case "g":
 			err := this.handleCommand_g(op, resources)
 			if err != nil {
+				common.Log.Error("err=%v", err)
 				return err
 			}
 		case "RG":
 			err := this.handleCommand_RG(op, resources)
 			if err != nil {
+				common.Log.Error("err=%v", err)
 				return err
 			}
 		case "rg":
 			err := this.handleCommand_rg(op, resources)
 			if err != nil {
+				common.Log.Error("err=%v", err)
 				return err
 			}
 		case "K":
 			err := this.handleCommand_K(op, resources)
 			if err != nil {
+				common.Log.Error("err=%v", err)
 				return err
 			}
 		case "k":
 			err := this.handleCommand_k(op, resources)
 			if err != nil {
+				common.Log.Error("err=%v", err)
 				return err
 			}
 		}
@@ -445,6 +456,7 @@ func (this *ContentStreamProcessor) handleCommand_scn(op *ContentStreamOperation
 
 	color, err := cs.ColorFromPdfObjects(op.Params)
 	if err != nil {
+		common.Log.Error("cs=%T err=%v", cs, err)
 		return err
 	}
 

@@ -3,9 +3,6 @@
  * file 'LICENSE.md', which is part of this source code package.
  */
 
-// The core package provides fundamental functionality for handling PDFs, including definitions of the core PDF objects
-// (primitives), parsing a PDF file as a series of primitives, io, cross references, repairs, encryption, encoding and
-// other core capabilities.
 package core
 
 import (
@@ -35,6 +32,7 @@ var reIndirectObject = regexp.MustCompile(`(\d+)\s+(\d+)\s+obj`)
 var reXrefSubsection = regexp.MustCompile(`(\d+)\s+(\d+)\s*$`)
 var reXrefEntry = regexp.MustCompile(`(\d+)\s+(\d+)\s+([nf])\s*$`)
 
+// PdfParser parses a PDF file and provides access to the object structure of the PDF.
 type PdfParser struct {
 	majorVersion int
 	minorVersion int
@@ -45,7 +43,7 @@ type PdfParser struct {
 	xrefs            XrefTable
 	objstms          ObjectStreams
 	trailer          *PdfObjectDictionary
-	ObjCache         ObjectCache
+	ObjCache         ObjectCache // TODO: Unexport (v3).
 	crypter          *PdfCrypt
 	repairsAttempted bool // Avoid multiple attempts for repair.
 
@@ -56,14 +54,18 @@ type PdfParser struct {
 	streamLengthReferenceLookupInProgress map[int64]bool
 }
 
+// GetCrypter returns the PdfCrypt instance which has information about the PDFs encryption.
 func (this *PdfParser) GetCrypter() *PdfCrypt {
 	return this.crypter
 }
 
+// IsAuthenticated returns true if the PDF has already been authenticated for accessing.
 func (this *PdfParser) IsAuthenticated() bool {
 	return this.crypter.Authenticated
 }
 
+// GetTrailer returns the PDFs trailer dictionary. The trailer dictionary is typically the starting point for a PDF,
+// referencing other key objects that are important in the document structure.
 func (this *PdfParser) GetTrailer() *PdfObjectDictionary {
 	return this.trailer
 }
@@ -542,7 +544,7 @@ func (this *PdfParser) parseObject() (PdfObject, error) {
 			result1 := reReference.FindStringSubmatch(string(peekStr))
 			if len(result1) > 1 {
 				bb, _ = this.reader.ReadBytes('R')
-				common.Log.Trace("-> !Ref: '%s'", string(bb[:len(bb)]))
+				common.Log.Trace("-> !Ref: '%s'", string(bb[:]))
 				ref, err := parseReference(string(bb))
 				return &ref, err
 			}
@@ -573,6 +575,7 @@ func (this *PdfParser) parseObject() (PdfObject, error) {
 }
 
 // Reads and parses a PDF dictionary object enclosed with '<<' and '>>'
+// TODO: Unexport (v3).
 func (this *PdfParser) ParseDict() (*PdfObjectDictionary, error) {
 	common.Log.Trace("Reading PDF Dict!")
 
@@ -776,7 +779,7 @@ func (this *PdfParser) parseXrefTable() (*PdfObjectDictionary, error) {
 
 		if txt == "%%EOF" {
 			common.Log.Debug("ERROR: end of file - trailer not found - error!")
-			return nil, errors.New("End of file - trailer not found!")
+			return nil, errors.New("End of file - trailer not found")
 		}
 
 		common.Log.Trace("xref more : %s", txt)
@@ -805,7 +808,7 @@ func (this *PdfParser) parseXrefStream(xstm *PdfObjectInteger) (*PdfObjectDictio
 	xs, ok := xrefObj.(*PdfObjectStream)
 	if !ok {
 		common.Log.Debug("ERROR: XRefStm pointing to non-stream object!")
-		return nil, errors.New("XRefStm pointing to a non-stream object!")
+		return nil, errors.New("XRefStm pointing to a non-stream object")
 	}
 
 	trailerDict := xs.PdfObjectDictionary
@@ -852,6 +855,15 @@ func (this *PdfParser) parseXrefStream(xstm *PdfObjectInteger) (*PdfObjectDictio
 	s1 := int(b[0] + b[1])
 	s2 := int(b[0] + b[1] + b[2])
 	deltab := int(b[0] + b[1] + b[2])
+
+	if s0 < 0 || s1 < 0 || s2 < 0 {
+		common.Log.Debug("Error s value < 0 (%d,%d,%d)", s0, s1, s2)
+		return nil, errors.New("Range check error")
+	}
+	if deltab == 0 {
+		common.Log.Debug("No xref objects in stream (deltab == 0)")
+		return trailerDict, nil
+	}
 
 	// Calculate expected entries.
 	entries := len(ds) / deltab
@@ -931,7 +943,6 @@ func (this *PdfParser) parseXrefStream(xstm *PdfObjectInteger) (*PdfObjectDictio
 		var tmp int64 = 0
 		for i := 0; i < len(v); i++ {
 			tmp += int64(v[i]) * (1 << uint(8*(len(v)-i-1)))
-
 		}
 		return tmp
 	}
@@ -1117,7 +1128,7 @@ func (this *PdfParser) seekToEOFMarker(fSize int64) error {
 // 3. Check the Prev xref
 // 4. Continue looking for Prev until not found.
 //
-// The earlier xrefs have higher precedance.  If objects already
+// The earlier xrefs have higher precedence.  If objects already
 // loaded will ignore older versions.
 //
 func (this *PdfParser) loadXrefs() (*PdfObjectDictionary, error) {
@@ -1297,8 +1308,9 @@ func (this *PdfParser) traceStreamLength(lengthObj PdfObject) (PdfObject, error)
 	return slo, nil
 }
 
-// Parse an indirect object from the input stream.
-// Can also be an object stream.
+// Parse an indirect object from the input stream. Can also be an object stream.
+// Returns the indirect object (*PdfIndirectObject) or the stream object (*PdfObjectStream).
+// TODO: Unexport (v3).
 func (this *PdfParser) ParseIndirectObject() (PdfObject, error) {
 	indirect := PdfIndirectObject{}
 
@@ -1474,6 +1486,7 @@ func (this *PdfParser) ParseIndirectObject() (PdfObject, error) {
 }
 
 // For testing purposes.
+// TODO: Unexport (v3) or move to test files, if needed by external test cases.
 func NewParserFromString(txt string) *PdfParser {
 	parser := PdfParser{}
 	buf := []byte(txt)
@@ -1489,8 +1502,8 @@ func NewParserFromString(txt string) *PdfParser {
 	return &parser
 }
 
-// Creates a new parser for a PDF file via ReadSeeker.  Loads the
-// cross reference stream and trailer.
+// NewParser creates a new parser for a PDF file via ReadSeeker. Loads the cross reference stream and trailer.
+// An error is returned on failure.
 func NewParser(rs io.ReadSeeker) (*PdfParser, error) {
 	parser := &PdfParser{}
 
@@ -1498,21 +1511,18 @@ func NewParser(rs io.ReadSeeker) (*PdfParser, error) {
 	parser.ObjCache = make(ObjectCache)
 	parser.streamLengthReferenceLookupInProgress = map[int64]bool{}
 
-	// Start by reading xrefs from bottom
+	// Start by reading the xrefs (from bottom).
 	trailer, err := parser.loadXrefs()
 	if err != nil {
 		common.Log.Debug("ERROR: Failed to load xref table! %s", err)
-		// Try to rebuild entire xref table?
 		return nil, err
 	}
 
 	common.Log.Trace("Trailer: %s", trailer)
 
 	if len(parser.xrefs) == 0 {
-		return nil, fmt.Errorf("Empty XREF table. Invalid.")
+		return nil, fmt.Errorf("Empty XREF table - Invalid")
 	}
-
-	// printXrefTable(parser.xrefs)
 
 	majorVersion, minorVersion, err := parser.parsePdfVersion()
 	if err != nil {
@@ -1527,11 +1537,10 @@ func NewParser(rs io.ReadSeeker) (*PdfParser, error) {
 	return parser, nil
 }
 
-// Check if the document is encrypted.  First time when called, will
-// check if the Encrypt dictionary is accessible through the trailer
-// dictionary.
-// If encrypted, prepares a crypt datastructure which can be used to
-// authenticate and decrypt the document.
+// IsEncrypted checks if the document is encrypted. A bool flag is returned indicating the result.
+// First time when called, will check if the Encrypt dictionary is accessible through the trailer dictionary.
+// If encrypted, prepares a crypt datastructure which can be used to authenticate and decrypt the document.
+// On failure, an error is returned.
 func (this *PdfParser) IsEncrypted() (bool, error) {
 	if this.crypter != nil {
 		return true, nil
@@ -1573,9 +1582,9 @@ func (this *PdfParser) IsEncrypted() (bool, error) {
 	return false, nil
 }
 
-// Decrypt the PDF file with a specified password.  Also tries to
-// decrypt with an empty password.  Returns true if successful,
-// false otherwise.
+// Decrypt attempts to decrypt the PDF file with a specified password.  Also tries to
+// decrypt with an empty password.  Returns true if successful, false otherwise.
+// An error is returned when there is a problem with decrypting.
 func (this *PdfParser) Decrypt(password []byte) (bool, error) {
 	// Also build the encryption/decryption key.
 	if this.crypter == nil {
@@ -1594,8 +1603,8 @@ func (this *PdfParser) Decrypt(password []byte) (bool, error) {
 	return authenticated, err
 }
 
-// Check access rights and permissions for a specified password.  If either user/owner password is specified,
-// full rights are granted, otherwise the access rights are specified by the Permissions flag.
+// CheckAccessRights checks access rights and permissions for a specified password. If either user/owner password is
+// specified, full rights are granted, otherwise the access rights are specified by the Permissions flag.
 //
 // The bool flag indicates that the user can access and view the file.
 // The AccessPermissions shows what access the user has for editing etc.
