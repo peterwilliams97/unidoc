@@ -20,6 +20,7 @@ type GraphicsState struct {
 	ColorspaceNonStroking PdfColorspace
 	ColorStroking         PdfColor
 	ColorNonStroking      PdfColor
+	CTM                   Matrix
 }
 
 type GraphicStateStack []GraphicsState
@@ -32,6 +33,11 @@ func (gsStack *GraphicStateStack) Pop() GraphicsState {
 	gs := (*gsStack)[len(*gsStack)-1]
 	*gsStack = (*gsStack)[:len(*gsStack)-1]
 	return gs
+}
+
+// Transform returns coordinates x, y transformed by the CTM
+func (gs *GraphicsState) Transform(x, y float64) (float64, float64) {
+	return gs.CTM.transform(x, y)
 }
 
 // ContentStreamProcessor defines a data structure and methods for processing a content stream, keeping track of the
@@ -200,6 +206,7 @@ func (this *ContentStreamProcessor) Process(resources *PdfPageResources) error {
 	this.graphicsState.ColorspaceNonStroking = NewPdfColorspaceDeviceGray()
 	this.graphicsState.ColorStroking = NewPdfColorDeviceGray(0)
 	this.graphicsState.ColorNonStroking = NewPdfColorDeviceGray(0)
+	this.graphicsState.CTM = identityMatrix()
 
 	for _, op := range this.operations {
 		var err error
@@ -236,6 +243,8 @@ func (this *ContentStreamProcessor) Process(resources *PdfPageResources) error {
 			err = this.handleCommand_K(op, resources)
 		case "k":
 			err = this.handleCommand_k(op, resources)
+		case "cm":
+			err = this.handleCommand_cm(op, resources)
 		}
 		if err != nil {
 			common.Log.Debug("Processor handling error (%s): %v", op.Operand, err)
@@ -542,4 +551,62 @@ func (this *ContentStreamProcessor) handleCommand_k(op *ContentStreamOperation, 
 	this.graphicsState.ColorNonStroking = color
 
 	return nil
+}
+
+// cm: concatenates an affine transform to the CTM
+func (this *ContentStreamProcessor) handleCommand_cm(op *ContentStreamOperation,
+	resources *PdfPageResources) error {
+	if len(op.Params) != 6 {
+		common.Log.Debug("Invalid number of parameters for cm: %d", len(op.Params))
+		return errors.New("Invalid number of parameters")
+	}
+
+	f, err := GetNumbersAsFloat(op.Params)
+	if err != nil {
+		return err
+	}
+	m := newMatrix(f[0], f[1], f[2], f[3], f[4], f[5])
+	this.graphicsState.CTM = this.graphicsState.CTM.mult(m)
+
+	return nil
+}
+
+// Matrix is a linear transform matrix in homogenous coordinates
+// PDF coordinate transforms are always affine so we only need 6 of these. See newMatrix
+type Matrix [9]float64
+
+// identityMatrix returns the identity transform
+func identityMatrix() Matrix {
+	return newMatrix(1, 0, 0, 1, 0, 0)
+}
+
+// newMatrix returns an affine transform matrix laid out in homogenous coordinates as
+//      a  b  0
+//      c  d  0
+//      tx ty 1
+func newMatrix(a, b, c, d, tx, ty float64) Matrix {
+	return Matrix{a, b, 0, c, d, 0, tx, ty, 1}
+}
+
+// mult returns a × b
+// a and b need to be created by newMatrix or this function. i.e. They must be affine transforms
+func (a Matrix) mult(b Matrix) Matrix {
+	return Matrix{
+		a[0]*b[0] + a[1]*b[3],
+		a[0]*b[1] + a[1]*b[4],
+		0,
+		a[3]*b[0] + a[4]*b[3],
+		a[3]*b[1] + a[4]*b[4],
+		0,
+		a[6]*b[0] + a[7]*b[3] + b[6],
+		a[6]*b[1] + a[7]*b[4] + b[7],
+		1,
+	}
+}
+
+// transform return coordinates x, y transformed by m
+func (m Matrix) transform(x, y float64) (float64, float64) {
+	xp := x*m[0] + y*m[1] + m[6]
+	yp := x*m[3] + y*m[4] + m[7]
+	return xp, yp
 }
