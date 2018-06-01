@@ -20,16 +20,17 @@ import (
 
 // XYText represents text and its position on a page
 type XYText struct {
-	X, Y float64
-	Text string
+	X, Y   float64
+	Orient contentstream.Orientation
+	Text   string
 }
 
 // TextList is a list of text and its position on a pdf page
 type TextList []XYText
 
 // add appends the location and position of text to a text list
-func (tl *TextList) add(x, y float64, text string) {
-	*tl = append(*tl, XYText{x, y, text})
+func (tl *TextList) add(x, y float64, o contentstream.Orientation, text string) {
+	*tl = append(*tl, XYText{x, y, o, text})
 }
 
 // ToText returns the contents of tl as a single string
@@ -52,6 +53,41 @@ func (tl *TextList) SortPosition() {
 		}
 		return ti.X < tj.X
 	})
+}
+
+func (tl *TextList) PageOrientation() contentstream.Orientation {
+	landscapeCount := 0
+	for _, t := range *tl {
+		if t.Orient == contentstream.OrientationLandscape {
+			landscapeCount++
+		}
+	}
+	portraitCount := len(*tl) - landscapeCount
+	// fmt.Printf("PageOrientation: landscape=%.1f%% = %d / %d \n",
+	// 	float64(landscapeCount)/float64(len(*tl))*100.0, landscapeCount, len(*tl))
+	if landscapeCount > portraitCount {
+		return contentstream.OrientationLandscape
+	}
+	return contentstream.OrientationPortrait
+}
+
+func (tl *TextList) Transform(a, b, c, d, tx, ty float64) *TextList {
+	m := contentstream.NewMatrix(a, b, c, d, tx, ty)
+	out := TextList{}
+	// fmt.Println("^^^^^^^^^^^$$$$$$$$$^^^^^^^^^^^^^^^^")
+	for _, t := range *tl {
+		x, y := m.Transform(t.X, t.Y)
+		o := XYText{
+			X:      x,
+			Y:      y,
+			Orient: t.Orient,
+			Text:   t.Text,
+		}
+		// fmt.Printf("%4d: %5.1f,%5.1f->%5.1f,%5.1f %q\n", i, t.X, t.Y, x, y, t.Text)
+		out = append(out, o)
+	}
+	// fmt.Println("^^^^^^^^^^^#########^^^^^^^^^^^^^^^^^")
+	return &out
 }
 
 // ExtractText processes and extracts all text data in content streams and returns as a string. Takes into
@@ -81,6 +117,7 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 	var codemap *cmap.CMap
 	inText := false
 	xPos, yPos := float64(-1), float64(-1)
+	orientation := contentstream.OrientationLandscape
 
 	processor.AddHandler(contentstream.HandlerConditionEnumAllOperands, "",
 		func(op *contentstream.ContentStreamOperation, gs contentstream.GraphicsState,
@@ -145,7 +182,7 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 					common.Log.Debug("T* operand outside text")
 					return nil
 				}
-				textList.add(xPos, yPos, "\n")
+				textList.add(xPos, yPos, orientation, "\n")
 			case "Td", "TD":
 				if !inText {
 					common.Log.Debug("Td/TD operand outside text")
@@ -169,11 +206,11 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 				}
 
 				if tx > 0 {
-					textList.add(xPos, yPos, " ")
+					textList.add(xPos, yPos, orientation, " ")
 				}
 				if ty < 0 {
 					// TODO: More flexible space characters?
-					textList.add(xPos, yPos, "\n")
+					textList.add(xPos, yPos, orientation, "\n")
 				}
 			case "Tm":
 				if !inText {
@@ -204,10 +241,11 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 				}
 				xx, yy := gs.Transform(float64(*xfloat), float64(*yfloat))
 				xfloat, yfloat = core.MakeFloat(xx), core.MakeFloat(yy)
+				orientation = gs.PageOrientation()
 				if yPos == -1 {
 					yPos = float64(*yfloat)
 				} else if yPos > float64(*yfloat) {
-					textList.add(xPos, yPos, "\n")
+					textList.add(xPos, yPos, orientation, "\n")
 					xPos = float64(*xfloat)
 					yPos = float64(*yfloat)
 					return nil
@@ -215,7 +253,7 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 				if xPos == -1 {
 					xPos = float64(*xfloat)
 				} else if xPos < float64(*xfloat) {
-					textList.add(xPos, yPos, "\t")
+					textList.add(xPos, yPos, orientation, "\t")
 					xPos = float64(*xfloat)
 				}
 			case "TJ":
@@ -234,17 +272,17 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 					switch v := obj.(type) {
 					case *core.PdfObjectString:
 						if codemap != nil {
-							textList.add(xPos, yPos, codemap.CharcodeBytesToUnicode([]byte(*v)))
+							textList.add(xPos, yPos, orientation, codemap.CharcodeBytesToUnicode([]byte(*v)))
 						} else {
-							textList.add(xPos, yPos, string(*v))
+							textList.add(xPos, yPos, orientation, string(*v))
 						}
 					case *core.PdfObjectFloat:
 						if *v < -100 {
-							textList.add(xPos, yPos, " ")
+							textList.add(xPos, yPos, orientation, " ")
 						}
 					case *core.PdfObjectInteger:
 						if *v < -100 {
-							textList.add(xPos, yPos, " ")
+							textList.add(xPos, yPos, orientation, " ")
 						}
 					}
 				}
@@ -261,9 +299,9 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 					return fmt.Errorf("Invalid parameter type, not string (%T)", op.Params[0])
 				}
 				if codemap != nil {
-					textList.add(xPos, yPos, codemap.CharcodeBytesToUnicode([]byte(*param)))
+					textList.add(xPos, yPos, orientation, codemap.CharcodeBytesToUnicode([]byte(*param)))
 				} else {
-					textList.add(xPos, yPos, string(*param))
+					textList.add(xPos, yPos, orientation, string(*param))
 				}
 			}
 

@@ -23,6 +23,13 @@ type GraphicsState struct {
 	CTM                   Matrix
 }
 
+type Orientation int
+
+const (
+	OrientationPortrait Orientation = iota
+	OrientationLandscape
+)
+
 type GraphicStateStack []GraphicsState
 
 func (gsStack *GraphicStateStack) Push(gs GraphicsState) {
@@ -37,7 +44,14 @@ func (gsStack *GraphicStateStack) Pop() GraphicsState {
 
 // Transform returns coordinates x, y transformed by the CTM
 func (gs *GraphicsState) Transform(x, y float64) (float64, float64) {
-	return gs.CTM.transform(x, y)
+	// xp, yp := gs.CTM.Transform(x, y)
+	// fmt.Printf("Transform. %5.1f,%5.1f->%5.1f,%5.1f %+v\n", x, y, xp, yp, gs.CTM)
+	return gs.CTM.Transform(x, y)
+}
+
+// Returns the likely page orientation given the CTM
+func (gs *GraphicsState) PageOrientation() Orientation {
+	return gs.CTM.pageOrientation()
 }
 
 // ContentStreamProcessor defines a data structure and methods for processing a content stream, keeping track of the
@@ -206,7 +220,7 @@ func (this *ContentStreamProcessor) Process(resources *PdfPageResources) error {
 	this.graphicsState.ColorspaceNonStroking = NewPdfColorspaceDeviceGray()
 	this.graphicsState.ColorStroking = NewPdfColorDeviceGray(0)
 	this.graphicsState.ColorNonStroking = NewPdfColorDeviceGray(0)
-	this.graphicsState.CTM = identityMatrix()
+	this.graphicsState.CTM = IdentityMatrix()
 
 	for _, op := range this.operations {
 		var err error
@@ -565,7 +579,7 @@ func (this *ContentStreamProcessor) handleCommand_cm(op *ContentStreamOperation,
 	if err != nil {
 		return err
 	}
-	m := newMatrix(f[0], f[1], f[2], f[3], f[4], f[5])
+	m := NewMatrix(f[0], f[1], f[2], f[3], f[4], f[5])
 	this.graphicsState.CTM = this.graphicsState.CTM.mult(m)
 
 	return nil
@@ -575,38 +589,45 @@ func (this *ContentStreamProcessor) handleCommand_cm(op *ContentStreamOperation,
 // PDF coordinate transforms are always affine so we only need 6 of these. See newMatrix
 type Matrix [9]float64
 
-// identityMatrix returns the identity transform
-func identityMatrix() Matrix {
-	return newMatrix(1, 0, 0, 1, 0, 0)
+// IdentityMatrix returns the identity transform
+func IdentityMatrix() Matrix {
+	return NewMatrix(1, 0, 0, 1, 0, 0)
 }
 
-// newMatrix returns an affine transform matrix laid out in homogenous coordinates as
+// NewMatrix returns an affine transform matrix laid out in homogenous coordinates as
 //      a  b  0
 //      c  d  0
 //      tx ty 1
-func newMatrix(a, b, c, d, tx, ty float64) Matrix {
-	return Matrix{a, b, 0, c, d, 0, tx, ty, 1}
+func NewMatrix(a, b, c, d, tx, ty float64) Matrix {
+	return Matrix{
+		a, b, 0,
+		c, d, 0,
+		tx, ty, 1,
+	}
 }
 
 // mult returns a × b
 // a and b need to be created by newMatrix or this function. i.e. They must be affine transforms
 func (a Matrix) mult(b Matrix) Matrix {
 	return Matrix{
-		a[0]*b[0] + a[1]*b[3],
-		a[0]*b[1] + a[1]*b[4],
-		0,
-		a[3]*b[0] + a[4]*b[3],
-		a[3]*b[1] + a[4]*b[4],
-		0,
-		a[6]*b[0] + a[7]*b[3] + b[6],
-		a[6]*b[1] + a[7]*b[4] + b[7],
-		1,
+		a[0]*b[0] + a[1]*b[3], a[0]*b[1] + a[1]*b[4], 0,
+		a[3]*b[0] + a[4]*b[3], a[3]*b[1] + a[4]*b[4], 0,
+		a[6]*b[0] + a[7]*b[3] + b[6], a[6]*b[1] + a[7]*b[4] + b[7], 1,
 	}
 }
 
-// transform return coordinates x, y transformed by m
-func (m Matrix) transform(x, y float64) (float64, float64) {
+// transform returns coordinates x, y transformed by m
+func (m Matrix) Transform(x, y float64) (float64, float64) {
 	xp := x*m[0] + y*m[1] + m[6]
 	yp := x*m[3] + y*m[4] + m[7]
 	return xp, yp
+}
+
+func (m Matrix) pageOrientation() Orientation {
+	switch {
+	case m[1]*m[1]+m[3]*m[3] > m[0]*m[0]+m[4]*m[4]:
+		return OrientationLandscape
+	default:
+		return OrientationPortrait
+	}
 }
