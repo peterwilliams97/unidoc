@@ -96,8 +96,8 @@ func (c Circle) Draw(gsName string) ([]byte, *pdf.PdfRectangle, error) {
 	return creator.Bytes(), bbox, nil
 }
 
-// A rectangle defined with a specified Width and Height and a lower left corner at (X,Y).  The rectangle can
-// optionally have a border and a filling color.
+// Rectangle defines a rectangle with a specified Width and Height and a lower left corner at (X,Y).
+// The rectangle can optionally have a border and a filling color.
 // The Width/Height includes the border (if any specified), i.e. is positioned inside.
 type Rectangle struct {
 	X             float64
@@ -175,8 +175,8 @@ const (
 	LineEndingStyleButt  LineEndingStyle = 2
 )
 
-// Defines a line between point 1 (X1,Y1) and point 2 (X2,Y2).  The line ending styles can be none (regular line),
-// or arrows at either end.  The line also has a specified width, color and opacity.
+// Line defines a line between point 1 (X1,Y1) and point 2 (X2,Y2).  The line ending styles can be
+// none (regular line), or arrows at either end.  The line also has a specified width, color and opacity.
 type Line struct {
 	X1               float64
 	Y1               float64

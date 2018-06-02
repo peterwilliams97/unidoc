@@ -623,6 +623,7 @@ func (m Matrix) Transform(x, y float64) (float64, float64) {
 	return xp, yp
 }
 
+// pageOrientation returns a guess at the pdf page orientation when text is printed with CTM m
 func (m Matrix) pageOrientation() Orientation {
 	switch {
 	case m[1]*m[1]+m[3]*m[3] > m[0]*m[0]+m[4]*m[4]:

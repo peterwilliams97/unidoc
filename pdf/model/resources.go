@@ -118,11 +118,8 @@ func (r *PdfPageResources) GetExtGState(keyName PdfObjectName) (PdfObject, bool)
 		return nil, false
 	}
 
-	if obj := dict.Get(keyName); obj != nil {
-		return obj, true
-	} else {
-		return nil, false
-	}
+	obj := dict.Get(keyName)
+	return obj, obj != nil
 }
 
 // Check whether a font is defined by the specified keyName.
@@ -225,11 +222,8 @@ func (r *PdfPageResources) GetFontByName(keyName PdfObjectName) (PdfObject, bool
 		return nil, false
 	}
 
-	if obj := fontDict.Get(keyName); obj != nil {
-		return obj, true
-	} else {
-		return nil, false
-	}
+	obj := fontDict.Get(keyName)
+	return obj, obj != nil
 }
 
 // Check whether a font is defined by the specified keyName.
@@ -289,11 +283,7 @@ func (r *PdfPageResources) SetColorspaceByName(keyName PdfObjectName, cs PdfColo
 // Check if an XObject with a specified keyName is defined.
 func (r *PdfPageResources) HasXObjectByName(keyName PdfObjectName) bool {
 	obj, _ := r.GetXObjectByName(keyName)
-	if obj != nil {
-		return true
-	} else {
-		return false
-	}
+	return obj != nil
 }
 
 type XObjectType int

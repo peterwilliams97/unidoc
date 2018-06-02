@@ -5,96 +5,108 @@
 
 package draw
 
+import "github.com/unidoc/unidoc/common"
+
+// Path describes a pdf path
 // A path consists of straight line connections between each point defined in an array of points.
 type Path struct {
 	Points []Point
 }
 
+// NewPath returns an empty Path
 func NewPath() Path {
 	path := Path{}
 	path.Points = []Point{}
 	return path
 }
 
-func (this Path) AppendPoint(point Point) Path {
-	this.Points = append(this.Points, point)
-	return this
+// AppendPoint returns a copy of `path` with `point` appended to it.
+// XXX: Is this intended? Why not update `path` in place?
+func (path Path) AppendPoint(point Point) Path {
+	path.Points = append(path.Points, point)
+	common.Log.Debug("path.AppendPoint: point=%+v Points=%+v path=%+v", point, path.Points, path)
+	return path
 }
 
-func (this Path) RemovePoint(number int) Path {
-	if number < 1 || number > len(this.Points) {
-		return this
+// RemovePoint returns a copy of `path` with the `number`th point in removed. `number` is 1-offset
+// XXX: Is this intended? Why not update `path` in place?
+func (path Path) RemovePoint(number int) Path {
+	if number < 1 || number > len(path.Points) {
+		return path
 	}
 
 	idx := number - 1
-	this.Points = append(this.Points[:idx], this.Points[idx+1:]...)
-	return this
+	path.Points = append(path.Points[:idx], path.Points[idx+1:]...)
+	return path
 }
 
-func (this Path) Length() int {
-	return len(this.Points)
+// Length returns the number of points in `path`
+func (path Path) Length() int {
+	return len(path.Points)
 }
 
-func (this Path) GetPointNumber(number int) Point {
-	if number < 1 || number > len(this.Points) {
+// GetPointNumber returns the `number`th point in `path`. `number` is 1-offset
+// If this point is not in the path then a zero Point is returned
+func (path Path) GetPointNumber(number int) Point {
+	if number < 1 || number > len(path.Points) {
 		return Point{}
 	}
-	return this.Points[number-1]
+	return path.Points[number-1]
 }
 
+// Copy returns a copy of `path`
 func (path Path) Copy() Path {
-	pathcopy := Path{}
-	pathcopy.Points = []Point{}
+	pathcopy := NewPath()
 	for _, p := range path.Points {
 		pathcopy.Points = append(pathcopy.Points, p)
 	}
 	return pathcopy
 }
 
-func (path Path) Offset(offX, offY float64) Path {
+// Offset returns a copy of `path` translate by `dX`,`dY`
+// XXX: Should this be called Translate?
+func (path Path) Offset(dX, dY float64) Path {
 	for i, p := range path.Points {
-		path.Points[i] = p.Add(offX, offY)
+		path.Points[i] = p.Add(dX, dY)
 	}
 	return path
 }
 
+// GetBoundingBox returns `path`'s bounding box
 func (path Path) GetBoundingBox() BoundingBox {
-	bbox := BoundingBox{}
+	if len(path.Points) == 0 {
+		return BoundingBox{}
+	}
 
-	minX := 0.0
-	maxX := 0.0
-	minY := 0.0
-	maxY := 0.0
-	for idx, p := range path.Points {
-		if idx == 0 {
-			minX = p.X
-			maxX = p.X
-			minY = p.Y
-			maxY = p.Y
-			continue
-		}
-
+	p := path.Points[0]
+	minX := p.X
+	maxX := p.X
+	minY := p.Y
+	maxY := p.Y
+	for _, p := range path.Points[1:] {
 		if p.X < minX {
 			minX = p.X
-		}
-		if p.X > maxX {
+		} else if p.X > maxX {
 			maxX = p.X
 		}
 		if p.Y < minY {
 			minY = p.Y
-		}
-		if p.Y > maxY {
+		} else if p.Y > maxY {
 			maxY = p.Y
 		}
 	}
 
-	bbox.X = minX
-	bbox.Y = minY
-	bbox.Width = maxX - minX
-	bbox.Height = maxY - minY
-	return bbox
+	return BoundingBox{
+		X:      minX,
+		Y:      minY,
+		Width:  maxX - minX,
+		Height: maxY - minY,
+	}
 }
 
+// BoundingBox describes a bounding box. X,Y is the bottom,left of the bounding box (i.e.
+// lowest coordinate values)
+// XXX Why not Llx, LLy, URx, URy like PdfRectangle?
 type BoundingBox struct {
 	X      float64
 	Y      float64
