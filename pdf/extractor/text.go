@@ -20,17 +20,24 @@ import (
 
 // XYText represents text and its position on a page
 type XYText struct {
-	X, Y   float64
-	Orient contentstream.Orientation
-	Text   string
+	X, Y             float64
+	ColorStroking    model.PdfColor // Colour that text is stroked with, if any
+	ColorNonStroking model.PdfColor // Colour that text is filled with, if any
+	Orient           contentstream.Orientation
+	Text             string
+}
+
+// String returns a string describing `t`
+func (t *XYText) String() string {
+	return fmt.Sprintf("(%.1f,%.1f,%t,%q)", t.X, t.Y, t.Orient, t.Text)
 }
 
 // TextList is a list of text and its position on a pdf page
 type TextList []XYText
 
 // add appends the location and position of text to a text list
-func (tl *TextList) add(x, y float64, o contentstream.Orientation, text string) {
-	*tl = append(*tl, XYText{x, y, o, text})
+func (tl *TextList) add(x, y float64, cs, cf model.PdfColor, o contentstream.Orientation, text string) {
+	*tl = append(*tl, XYText{x, y, cs, cf, o, text})
 }
 
 // ToText returns the contents of tl as a single string
@@ -71,23 +78,15 @@ func (tl *TextList) PageOrientation() contentstream.Orientation {
 	return contentstream.OrientationPortrait
 }
 
-func (tl *TextList) Transform(a, b, c, d, tx, ty float64) *TextList {
+// Transform transforms all points in `tl` by the affine transformation a, b, c, d, tx, ty
+func (tl *TextList) Transform(a, b, c, d, tx, ty float64) {
 	m := contentstream.NewMatrix(a, b, c, d, tx, ty)
-	out := TextList{}
 	// fmt.Println("^^^^^^^^^^^$$$$$$$$$^^^^^^^^^^^^^^^^")
 	for _, t := range *tl {
-		x, y := m.Transform(t.X, t.Y)
-		o := XYText{
-			X:      x,
-			Y:      y,
-			Orient: t.Orient,
-			Text:   t.Text,
-		}
-		// fmt.Printf("%4d: %5.1f,%5.1f->%5.1f,%5.1f %q\n", i, t.X, t.Y, x, y, t.Text)
-		out = append(out, o)
+		t.X, t.Y = m.Transform(t.X, t.Y)
+		// fmt.Printf("%4d: %s\n", i, t)
 	}
 	// fmt.Println("^^^^^^^^^^^#########^^^^^^^^^^^^^^^^^")
-	return &out
 }
 
 // ExtractText processes and extracts all text data in content streams and returns as a string. Takes into
@@ -122,6 +121,11 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 	processor.AddHandler(contentstream.HandlerConditionEnumAllOperands, "",
 		func(op *contentstream.ContentStreamOperation, gs contentstream.GraphicsState,
 			resources *model.PdfPageResources) error {
+
+			addText := func(text string) {
+				textList.add(xPos, yPos, gs.ColorStroking, gs.ColorNonStroking, orientation, text)
+			}
+
 			operand := op.Operand
 			switch operand {
 			case "BT":
@@ -182,7 +186,7 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 					common.Log.Debug("T* operand outside text")
 					return nil
 				}
-				textList.add(xPos, yPos, orientation, "\n")
+				addText("\n")
 			case "Td", "TD":
 				if !inText {
 					common.Log.Debug("Td/TD operand outside text")
@@ -206,11 +210,11 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 				}
 
 				if tx > 0 {
-					textList.add(xPos, yPos, orientation, " ")
+					addText(" ")
 				}
 				if ty < 0 {
 					// TODO: More flexible space characters?
-					textList.add(xPos, yPos, orientation, "\n")
+					addText("\n")
 				}
 			case "Tm":
 				if !inText {
@@ -245,7 +249,7 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 				if yPos == -1 {
 					yPos = float64(*yfloat)
 				} else if yPos > float64(*yfloat) {
-					textList.add(xPos, yPos, orientation, "\n")
+					addText("\n")
 					xPos = float64(*xfloat)
 					yPos = float64(*yfloat)
 					return nil
@@ -253,7 +257,7 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 				if xPos == -1 {
 					xPos = float64(*xfloat)
 				} else if xPos < float64(*xfloat) {
-					textList.add(xPos, yPos, orientation, "\t")
+					addText("\t")
 					xPos = float64(*xfloat)
 				}
 			case "TJ":
@@ -272,17 +276,17 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 					switch v := obj.(type) {
 					case *core.PdfObjectString:
 						if codemap != nil {
-							textList.add(xPos, yPos, orientation, codemap.CharcodeBytesToUnicode([]byte(*v)))
+							addText(codemap.CharcodeBytesToUnicode([]byte(*v)))
 						} else {
-							textList.add(xPos, yPos, orientation, string(*v))
+							addText(string(*v))
 						}
 					case *core.PdfObjectFloat:
 						if *v < -100 {
-							textList.add(xPos, yPos, orientation, " ")
+							addText(" ")
 						}
 					case *core.PdfObjectInteger:
 						if *v < -100 {
-							textList.add(xPos, yPos, orientation, " ")
+							addText(" ")
 						}
 					}
 				}
@@ -299,9 +303,9 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 					return fmt.Errorf("Invalid parameter type, not string (%T)", op.Params[0])
 				}
 				if codemap != nil {
-					textList.add(xPos, yPos, orientation, codemap.CharcodeBytesToUnicode([]byte(*param)))
+					addText(codemap.CharcodeBytesToUnicode([]byte(*param)))
 				} else {
-					textList.add(xPos, yPos, orientation, string(*param))
+					addText(string(*param))
 				}
 			}
 

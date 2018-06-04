@@ -27,6 +27,22 @@ func getNumberAsFloat(obj core.PdfObject) (float64, error) {
 	return 0, errors.New("Not a number")
 }
 
+// minFloat returns the lesser of `a` and `b`
+func minFloat(a, b float64) float64 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// maxFloat returns the greater of `a` and `b`
+func maxFloat(a, b float64) float64 {
+	if a > b {
+		return a
+	}
+	return b
+}
+
 func procBuf(buf *bytes.Buffer) {
 	if isTesting {
 		return
