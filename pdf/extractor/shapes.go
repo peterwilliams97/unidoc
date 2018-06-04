@@ -11,7 +11,6 @@ import (
 
 	"github.com/unidoc/unidoc/common"
 	"github.com/unidoc/unidoc/pdf/contentstream"
-	"github.com/unidoc/unidoc/pdf/core"
 	"github.com/unidoc/unidoc/pdf/model"
 )
 
@@ -35,7 +34,8 @@ func (e *Extractor) ExtractShapes() (*ShapeList, error) {
 		func(op *contentstream.ContentStreamOperation, gs contentstream.GraphicsState,
 			resources *model.PdfPageResources) error {
 			operand := op.Operand
-			fmt.Printf("op=%+v\n", op)
+			// common.Log.Debug("++Operand: %s", op.String())
+
 			switch operand {
 			case "BT":
 				inText = true
@@ -64,7 +64,6 @@ func (e *Extractor) ExtractShapes() (*ShapeList, error) {
 				}
 				shape = NewShape()
 				shape.AppendPoint(cp)
-				common.Log.Debug("m operator. shape=%+v", shape)
 				if shape.Empty() {
 					panic("path not created   ")
 				}
@@ -202,6 +201,27 @@ func (e *Extractor) ExtractShapes() (*ShapeList, error) {
 					common.Log.Debug("%s operand inside text", operand)
 					return nil
 				}
+
+				lastPath := shapeList.LastPath(&shape)
+				switch operand {
+				case "s", "S":
+					lastPath.ColorStroking = gs.ColorStroking
+				case "f", "F": // close and fill path with winding rule fill
+					lastPath.ColorNonStroking = gs.ColorNonStroking
+					lastPath.FillType = FillRuleWinding
+				case "f*": // close and fill path with odd-even fill
+					lastPath.ColorNonStroking = gs.ColorNonStroking
+					lastPath.FillType = FillRuleOddEven
+				case "b", "B": // close, stroke and fill path with winding rule fill
+					lastPath.ColorStroking = gs.ColorStroking
+					lastPath.ColorNonStroking = gs.ColorNonStroking
+					lastPath.FillType = FillRuleWinding
+				case "b*", "B*": //// close, stroke and fill path with odd-even rule fill
+					lastPath.ColorStroking = gs.ColorStroking
+					lastPath.ColorNonStroking = gs.ColorNonStroking
+					lastPath.FillType = FillRuleOddEven
+				}
+
 				switch operand {
 				case "s", "f", "F", "b", "b*", "n":
 					if !shape.Empty() {
@@ -210,25 +230,6 @@ func (e *Extractor) ExtractShapes() (*ShapeList, error) {
 						shape = NewShape()
 						cp = Point{}
 					}
-				}
-				lastPath := shapeList.LastPath(shape)
-				switch operand {
-				case "s", "S":
-					lastPath.ColorStroking = gs.ColorStroking
-				case "f", "F": // close and fill path
-					lastPath.ColorNonStroking = gs.ColorNonStroking
-					lastPath.FillType = FillRuleWinding
-				case "f*": // close and fill path
-					lastPath.ColorNonStroking = gs.ColorNonStroking
-					lastPath.FillType = FillRuleOddEven
-				case "b", "B": // close and fill path
-					lastPath.ColorStroking = gs.ColorStroking
-					lastPath.ColorNonStroking = gs.ColorNonStroking
-					lastPath.FillType = FillRuleWinding
-				case "b*", "B*": // close and fill path
-					lastPath.ColorStroking = gs.ColorStroking
-					lastPath.ColorNonStroking = gs.ColorNonStroking
-					lastPath.FillType = FillRuleOddEven
 				}
 			}
 			return nil
@@ -270,6 +271,11 @@ const (
 	FillRuleOddEven
 )
 
+func (shape *Shape) String() string {
+	return fmt.Sprintf("stroke:%+v fill:%+v lines:%d curves:%d",
+		shape.ColorStroking, shape.ColorNonStroking, shape.Lines.Length(), shape.Curves.Length())
+}
+
 // NewShape returns an empty Shape
 func NewShape() Shape {
 	return Shape{}
@@ -282,7 +288,7 @@ func (shape *Shape) AppendPoint(point Point) {
 	n := shape.Lines.Length()
 	shape.Lines.AppendPoint(point)
 	shape.Segments = append(shape.Segments, PathSegment{n, false})
-	common.Log.Debug("AppendPath: point=%+v shape=%+v", point, shape)
+	common.Log.Debug("AppendPath: point=%s shape=%d", point.String(), shape.Length())
 	if shape.Empty() {
 		panic("empty!")
 	}
@@ -300,7 +306,7 @@ func (shape *Shape) AppendCurve(p0, p1, p2, p3 Point) {
 	}
 	shape.Curves.AppendCurve(curve)
 	shape.Segments = append(shape.Segments, PathSegment{n, true})
-	common.Log.Debug("AppendPath: curve=%+v shape=%+v", curve, shape)
+	// common.Log.Debug("AppendCurve: point=%s shape=%s", point.String(), shape.String())
 	if shape.Empty() {
 		panic("empty!")
 	}
@@ -356,7 +362,7 @@ func (shape *Shape) transformByMatrix(m contentstream.Matrix) {
 	shape.Curves.transformByMatrix(m)
 }
 
-// GetBoundingBox returns `shape`s  bounding box
+// GetBoundingBox returns `shape`s bounding box
 func (shape *Shape) GetBoundingBox() BoundingBox {
 	bboxL := shape.Lines.GetBoundingBox()
 	bboxC := shape.Curves.GetBoundingBox()
@@ -367,6 +373,7 @@ func (shape *Shape) GetBoundingBox() BoundingBox {
 	} else if shape.Curves.Length() == 0 {
 		return bboxL
 	}
+
 	return BoundingBox{
 		Ll: Point{minFloat(bboxL.Ll.X, bboxC.Ll.X), minFloat(bboxL.Ll.Y, bboxC.Ll.Y)},
 		Ur: Point{maxFloat(bboxL.Ur.X, bboxC.Ur.X), maxFloat(bboxL.Ur.Y, bboxC.Ur.Y)},
@@ -377,11 +384,11 @@ func (sl *ShapeList) Length() int {
 	return len(sl.Shapes)
 }
 
-func (sl *ShapeList) LastPath(currentPath Shape) *Shape {
-	if currentPath.Empty() {
-		currentPath = sl.Shapes[len(sl.Shapes)-1]
+func (sl *ShapeList) LastPath(currentPath *Shape) *Shape {
+	if len(sl.Shapes) > 0 {
+		currentPath = &sl.Shapes[len(sl.Shapes)-1]
 	}
-	return &currentPath
+	return currentPath
 }
 
 // add appends a Shape to the path list
@@ -402,72 +409,4 @@ func (sl *ShapeList) transformByMatrix(m contentstream.Matrix) {
 	for _, shape := range sl.Shapes {
 		shape.transformByMatrix(m)
 	}
-}
-
-func toPageCoords(gs contentstream.GraphicsState, objs []core.PdfObject) (Point, error) {
-	x, y, err := toFloatXY(objs)
-	if err != nil {
-		return Point{}, err
-	}
-	return toPagePoint(gs, x, y), nil
-}
-
-func toPagePointList(gs contentstream.GraphicsState, objs []core.PdfObject) (points []Point, err error) {
-	if len(objs)%2 != 0 {
-		err = fmt.Errorf("Invalid number of params: %d", len(objs))
-		common.Log.Debug("toPagePointList: err=%v", err)
-		return
-	}
-	floats, err := toFloatList(objs)
-	if err != nil {
-		return
-	}
-	for i := 0; i <= len(floats)-1; i += 2 {
-		x, y := floats[i], floats[i+1]
-		points = append(points, toPagePoint(gs, x, y))
-	}
-	return
-}
-
-func toPagePoint(gs contentstream.GraphicsState, x, y float64) Point {
-	x, y = gs.Transform(x, y)
-	return Point{x, y}
-}
-
-func toFloatXY(objs []core.PdfObject) (x, y float64, err error) {
-	if len(objs) != 2 {
-		err = fmt.Errorf("Invalid number of params: %d", len(objs))
-		common.Log.Debug("toFloatXY: err=%v", err)
-		return
-	}
-	floats, err := toFloatList(objs)
-	if err != nil {
-		return
-	}
-	x, y = floats[0], floats[1]
-	return
-}
-
-func toFloatList(objs []core.PdfObject) ([]float64, error) {
-	floats := []float64{}
-	for _, o := range objs {
-		x, err := toFloat(o)
-		if err != nil {
-			return nil, err
-		}
-		floats = append(floats, x)
-	}
-	return floats, nil
-}
-
-func toFloat(o core.PdfObject) (float64, error) {
-	if x, ok := o.(*core.PdfObjectFloat); ok {
-		return float64(*x), nil
-	}
-	if xint, ok := o.(*core.PdfObjectInteger); ok {
-		return float64(*xint), nil
-	}
-	err := fmt.Errorf("Invalid float param: %T", o)
-	common.Log.Debug("toFloat: err=%v", err)
-	return 0.0, err
 }

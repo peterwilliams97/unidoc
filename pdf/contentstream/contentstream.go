@@ -19,6 +19,10 @@ type ContentStreamOperation struct {
 
 type ContentStreamOperations []*ContentStreamOperation
 
+func (cso *ContentStreamOperation) String() string {
+	return fmt.Sprintf("%3s: %s", cso.Operand, cso.Params)
+}
+
 // Check if the content stream operations are fully wrapped (within q ... Q)
 func (this *ContentStreamOperations) isWrapped() bool {
 	if len(*this) < 2 {

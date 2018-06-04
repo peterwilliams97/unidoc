@@ -97,6 +97,10 @@ type BoundingBox struct {
 	Ur Point // upper,right i.e. highest coordinate values
 }
 
+func (bbox *BoundingBox) String() string {
+	return fmt.Sprintf("Lx:%s Ur:%s", bbox.Ll.String(), bbox.Ur.String())
+}
+
 // Transform transforms `bbox` by the affine transformation a, b, c, d, tx, ty
 func (bbox *BoundingBox) Transform(a, b, c, d, tx, ty float64) {
 	m := contentstream.NewMatrix(a, b, c, d, tx, ty)

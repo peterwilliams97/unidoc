@@ -10,9 +10,69 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/common"
 	"github.com/unidoc/unidoc/common/license"
+	"github.com/unidoc/unidoc/pdf/contentstream"
 	"github.com/unidoc/unidoc/pdf/core"
 )
+
+func toPageCoords(gs contentstream.GraphicsState, objs []core.PdfObject) (Point, error) {
+	x, y, err := toFloatXY(objs)
+	if err != nil {
+		return Point{}, err
+	}
+	return toPagePoint(gs, x, y), nil
+}
+
+func toPagePointList(gs contentstream.GraphicsState, objs []core.PdfObject) (points []Point, err error) {
+	if len(objs)%2 != 0 {
+		err = fmt.Errorf("Invalid number of params: %d", len(objs))
+		common.Log.Debug("toPagePointList: err=%v", err)
+		return
+	}
+	floats, err := toFloatList(objs)
+	if err != nil {
+		return
+	}
+	for i := 0; i <= len(floats)-1; i += 2 {
+		x, y := floats[i], floats[i+1]
+		points = append(points, toPagePoint(gs, x, y))
+	}
+	return
+}
+
+func toPagePoint(gs contentstream.GraphicsState, x, y float64) Point {
+	xp, yp := gs.Transform(x, y)
+	p := Point{xp, yp}
+	// fmt.Printf("      toPagePoint(%5.1f,%5.1f) -> %s (%s)\n", x, y, p.String(), gs.CTM.String())
+	return p
+}
+
+func toFloatXY(objs []core.PdfObject) (x, y float64, err error) {
+	if len(objs) != 2 {
+		err = fmt.Errorf("Invalid number of params: %d", len(objs))
+		common.Log.Debug("toFloatXY: err=%v", err)
+		return
+	}
+	floats, err := toFloatList(objs)
+	if err != nil {
+		return
+	}
+	x, y = floats[0], floats[1]
+	return
+}
+
+func toFloatList(objs []core.PdfObject) ([]float64, error) {
+	floats := []float64{}
+	for _, o := range objs {
+		x, err := getNumberAsFloat(o)
+		if err != nil {
+			return nil, err
+		}
+		floats = append(floats, x)
+	}
+	return floats, nil
+}
 
 // getNumberAsFloat can retrieve numeric values from PdfObject (both integer/float).
 func getNumberAsFloat(obj core.PdfObject) (float64, error) {
@@ -41,6 +101,14 @@ func maxFloat(a, b float64) float64 {
 		return a
 	}
 	return b
+}
+
+// chomp returns the first `n` characters in string `s`
+func chomp(s string, n int) string {
+	if len(s) < n {
+		return s
+	}
+	return s[:n]
 }
 
 func procBuf(buf *bytes.Buffer) {
