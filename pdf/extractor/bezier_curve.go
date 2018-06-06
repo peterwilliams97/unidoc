@@ -14,7 +14,7 @@ import (
 	"github.com/unidoc/unidoc/pdf/contentstream"
 )
 
-// CubicBezierCurve describes a cubic bezier curve which is defined by:
+// CubicBezierCurve describes a cubic Bézier curve which is defined by:
 // R(t) = P0*(1-t)^3 + P1*3*t*(1-t)^2 + P2*3*t^2*(1-t) + P3*t^3
 // where P0 is the current point, P1, P2 control points and P3 the final point.
 type CubicBezierCurve struct {
@@ -26,12 +26,12 @@ type CubicBezierCurve struct {
 
 // NewCubicBezierCurve returns a CubicBezierCurve with points (xi, yi) i=0..3
 func NewCubicBezierCurve(x0, y0, x1, y1, x2, y2, x3, y3 float64) CubicBezierCurve {
-	curve := CubicBezierCurve{}
-	curve.P0 = NewPoint(x0, y0)
-	curve.P1 = NewPoint(x1, y1)
-	curve.P2 = NewPoint(x2, y2)
-	curve.P3 = NewPoint(x3, y3)
-	return curve
+	return CubicBezierCurve{
+		P0: NewPoint(x0, y0),
+		P1: NewPoint(x1, y1),
+		P2: NewPoint(x2, y2),
+		P3: NewPoint(x3, y3),
+	}
 }
 
 // Transform transforms all control points in `curve` by the affine transformation a, b, c, d, tx, ty
@@ -87,16 +87,14 @@ func (curve *CubicBezierCurve) GetBoundingBox() BoundingBox {
 	}
 }
 
-// CubicBezierPath represents a pdf path composed of cubic Bezier curves
+// CubicBezierPath represents a pdf path composed of cubic Bézier curves
 type CubicBezierPath struct {
 	Curves []CubicBezierCurve
 }
 
 // NewCubicBezierPath returns a CubicBezierPath with no curves
 func NewCubicBezierPath() CubicBezierPath {
-	bpath := CubicBezierPath{}
-	bpath.Curves = []CubicBezierCurve{}
-	return bpath
+	return CubicBezierPath{}
 }
 
 // AppendCurve appends `curve` to `bpath`

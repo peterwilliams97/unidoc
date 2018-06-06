@@ -16,6 +16,11 @@ func getUniDocVersion() string {
 	return common.Version
 }
 
+// GetNumbersAsFloat converts a pdf objects representing a float or integer to a float64 value. !@#$
+func GetNumberAsFloat(obj PdfObject) (float64, error) {
+	return getNumberAsFloat(obj)
+}
+
 func getNumberAsFloat(obj PdfObject) (float64, error) {
 	if fObj, ok := obj.(*PdfObjectFloat); ok {
 		return float64(*fObj), nil
@@ -29,15 +34,12 @@ func getNumberAsFloat(obj PdfObject) (float64, error) {
 }
 
 func isNullObject(obj PdfObject) bool {
-	if _, isNull := obj.(*PdfObjectNull); isNull {
-		return true
-	} else {
-		return false
-	}
+	_, isNull := obj.(*PdfObjectNull)
+	return isNull
 }
 
 // GetNumbersAsFloat converts a list of pdf objects representing floats or integers to a slice of
-// float64 values.
+// float64 values. !@#$
 func GetNumbersAsFloat(objects []PdfObject) ([]float64, error) {
 	return getNumbersAsFloat(objects)
 }
@@ -51,9 +53,13 @@ func getNumbersAsFloat(objects []PdfObject) ([]float64, error) {
 			return nil, err
 		}
 		floats = append(floats, val)
-
 	}
 	return floats, nil
+}
+
+func GetNumberAsInt(obj PdfObject) (int, error) {
+	n, err := getNumberAsInt64(obj)
+	return int(n), err
 }
 
 // Cases where expecting an integer, but some implementations actually

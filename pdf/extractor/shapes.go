@@ -19,16 +19,14 @@ func (e *Extractor) ExtractShapes() (*ShapeList, error) {
 	shapeList := &ShapeList{}
 	shape := Shape{}
 	cp := Point{}
+	inText := false
 
 	cstreamParser := contentstream.NewContentStreamParser(e.contents)
 	operations, err := cstreamParser.Parse()
 	if err != nil {
 		return shapeList, err
 	}
-
 	processor := contentstream.NewContentStreamProcessor(*operations)
-
-	inText := false
 
 	processor.AddHandler(contentstream.HandlerConditionEnumAllOperands, "",
 		func(op *contentstream.ContentStreamOperation, gs contentstream.GraphicsState,
@@ -294,7 +292,7 @@ func (shape *Shape) AppendPoint(point Point) {
 	}
 }
 
-// AppendCurve appends Bezier curve with control points p0,p1,p2,p3 to `shape`
+// AppendCurve appends Bézier curve with control points p0,p1,p2,p3 to `shape`
 // This can be used to move the current pointer or to add a line segmebnt
 func (shape *Shape) AppendCurve(p0, p1, p2, p3 Point) {
 	n := shape.Lines.Length()

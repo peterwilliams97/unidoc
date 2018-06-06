@@ -24,6 +24,11 @@ func NewPoint(x, y float64) Point {
 	return Point{X: x, Y: y}
 }
 
+// Set sets `p` to `x`,`y`
+func (p *Point) Set(x, y float64) {
+	p.X, p.Y = x, y
+}
+
 // Transform transforms `p` by the affine transformation a, b, c, d, tx, ty
 func (p *Point) Transform(a, b, c, d, tx, ty float64) {
 	m := contentstream.NewMatrix(a, b, c, d, tx, ty)

@@ -14,6 +14,19 @@ import (
 	"github.com/unidoc/unidoc/common/license"
 	"github.com/unidoc/unidoc/pdf/contentstream"
 	"github.com/unidoc/unidoc/pdf/core"
+	"github.com/unidoc/unidoc/pdf/model"
+)
+
+// The text rendering mode, Tmode, determines whether showing text shall cause glyph outlines to be
+// stroked, filled, used as a clipping boundary, or some combination of the three. Stroking,
+// filling, and clipping shall have the same effects for a text object as they do for a path object
+// (see 8.5.3, "Path-Painting Operators" and 8.5.4, "Clipping Path Operators"),
+type RenderMode int
+
+const (
+	RenderModeStroke RenderMode = 1 << iota
+	RenderModeFill
+	RenderModeClip
 )
 
 func toPageCoords(gs contentstream.GraphicsState, objs []core.PdfObject) (Point, error) {
@@ -63,6 +76,7 @@ func toFloatXY(objs []core.PdfObject) (x, y float64, err error) {
 }
 
 func toFloatList(objs []core.PdfObject) ([]float64, error) {
+	return model.GetNumbersAsFloat(objs)
 	floats := []float64{}
 	for _, o := range objs {
 		x, err := getNumberAsFloat(o)
@@ -74,8 +88,31 @@ func toFloatList(objs []core.PdfObject) ([]float64, error) {
 	return floats, nil
 }
 
+func getString(obj core.PdfObject) (string, error) {
+	if s, ok := obj.(*core.PdfObjectString); ok {
+		return string(*s), nil
+	}
+	err := errors.New("Not a string")
+	common.Log.Debug("getString: obj=%T %s err=%v", obj, obj.String(), err)
+	fmt.Printf("getString: obj=%T %s err=%v\n", obj, obj.String(), err)
+	panic(err)
+	return "", err
+}
+
+func getName(obj core.PdfObject) (string, error) {
+	if s, ok := obj.(*core.PdfObjectName); ok {
+		return string(*s), nil
+	}
+	err := errors.New("Not a name")
+	common.Log.Debug("getName: obj=%T %s err=%v", obj, obj.String(), err)
+	fmt.Printf("getName: obj=%T %s err=%v\n", obj, obj.String(), err)
+	panic(err)
+	return "", err
+}
+
 // getNumberAsFloat can retrieve numeric values from PdfObject (both integer/float).
 func getNumberAsFloat(obj core.PdfObject) (float64, error) {
+	// return model.GetNumberAsFloat(obj)
 	if fObj, ok := obj.(*core.PdfObjectFloat); ok {
 		return float64(*fObj), nil
 	}
