@@ -552,12 +552,17 @@ func (to *TextObject) getFont(name string) (*model.PdfFont, error) {
 func (to *TextObject) testFont(name string) {
 	font, err := to.getFont(name)
 	if err != nil {
-		panic(err)
+		common.Log.Debug("testFont: Font does not exist. name=%#q err=%v", name, err)
+		return
 	}
 	text := "^`_-|WjāXYZabc123ABCDEFG"
 	metrics, err := getCharMetrics(font, text)
 	if err != nil {
-		panic(err)
+		if err != nil {
+			common.Log.Debug("testFont: getCharMetrics failed. name=%#q text=%q err=%v",
+				name, text, err)
+			return
+		}
 	}
 	fmt.Println("=====================================")
 	fmt.Printf("font=%#q text=%q\n", name, text)

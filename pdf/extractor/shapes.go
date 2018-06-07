@@ -57,14 +57,8 @@ func (e *Extractor) ExtractShapes() (*ShapeList, error) {
 				if err != nil {
 					return err
 				}
-				if !shape.Empty() {
-					panic("path exists")
-				}
 				shape = NewShape()
 				shape.AppendPoint(cp)
-				if shape.Empty() {
-					panic("path not created   ")
-				}
 
 			case "l": // line to
 				if inText {
@@ -287,9 +281,6 @@ func (shape *Shape) AppendPoint(point Point) {
 	shape.Lines.AppendPoint(point)
 	shape.Segments = append(shape.Segments, PathSegment{n, false})
 	common.Log.Debug("AppendPath: point=%s shape=%d", point.String(), shape.Length())
-	if shape.Empty() {
-		panic("empty!")
-	}
 }
 
 // AppendCurve appends Bézier curve with control points p0,p1,p2,p3 to `shape`
@@ -305,16 +296,14 @@ func (shape *Shape) AppendCurve(p0, p1, p2, p3 Point) {
 	shape.Curves.AppendCurve(curve)
 	shape.Segments = append(shape.Segments, PathSegment{n, true})
 	// common.Log.Debug("AppendCurve: point=%s shape=%s", point.String(), shape.String())
-	if shape.Empty() {
-		panic("empty!")
-	}
 }
 
 // Origin returns the first point in `shape`
 // Do NOT call Origin with an empty shape
 func (shape *Shape) Origin() Point {
 	if shape.Empty() {
-		panic("Shape.Origin: No points")
+		common.Log.Error("Not allowed! Shape.Origin: No points")
+		return Point{}
 	}
 	i := shape.Segments[0].Index
 	if shape.Segments[0].Curved {

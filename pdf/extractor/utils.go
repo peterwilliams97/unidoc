@@ -94,8 +94,6 @@ func getString(obj core.PdfObject) (string, error) {
 	}
 	err := errors.New("Not a string")
 	common.Log.Debug("getString: obj=%T %s err=%v", obj, obj.String(), err)
-	fmt.Printf("getString: obj=%T %s err=%v\n", obj, obj.String(), err)
-	panic(err)
 	return "", err
 }
 
@@ -105,8 +103,6 @@ func getName(obj core.PdfObject) (string, error) {
 	}
 	err := errors.New("Not a name")
 	common.Log.Debug("getName: obj=%T %s err=%v", obj, obj.String(), err)
-	fmt.Printf("getName: obj=%T %s err=%v\n", obj, obj.String(), err)
-	panic(err)
 	return "", err
 }
 
