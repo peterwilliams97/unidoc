@@ -29,30 +29,45 @@ type PdfFont struct {
 func (font PdfFont) SetEncoder(encoder textencoding.TextEncoder) {
 	switch t := font.context.(type) {
 	case *pdfFontTrueType:
-		t.SetEncoder(encoder)
+		t.Encoder = encoder
+	default:
+		common.Log.Debug("SetEncoder. Not implemented for font type=%#T", font.context)
 	}
+}
+
+func (font PdfFont) GetEncoder() textencoding.TextEncoder {
+	switch t := font.context.(type) {
+	case *pdfFontTrueType:
+		return t.Encoder
+	default:
+		common.Log.Debug("GetEncoder. Not implemented for font type=%#T", font.context)
+		// XXX: Should we return a default encoding?
+	}
+	return nil
 }
 
 func (font PdfFont) GetGlyphCharMetrics(glyph string) (fonts.CharMetrics, bool) {
 	switch t := font.context.(type) {
 	case *pdfFontTrueType:
 		return t.GetGlyphCharMetrics(glyph)
+	default:
+		common.Log.Debug("GetGlyphCharMetrics. Not implemented for font type=%#T", font.context)
 	}
 
 	return fonts.CharMetrics{}, false
 }
 
-func newPdfFontFromPdfObject(obj core.PdfObject) (*PdfFont, error) {
+func NewPdfFontFromPdfObject(fontObj core.PdfObject) (*PdfFont, error) {
 	font := &PdfFont{}
 
-	dictObj := obj
-	if ind, is := obj.(*core.PdfIndirectObject); is {
+	dictObj := fontObj
+	if ind, is := fontObj.(*core.PdfIndirectObject); is {
 		dictObj = ind.PdfObject
 	}
 
 	d, ok := dictObj.(*core.PdfObjectDictionary)
 	if !ok {
-		common.Log.Debug("Font not given by a dictionary (%T)", obj)
+		common.Log.Debug("Font not given by a dictionary (%T)", fontObj)
 		return nil, errors.New("Type check error")
 	}
 
@@ -67,7 +82,7 @@ func newPdfFontFromPdfObject(obj core.PdfObject) (*PdfFont, error) {
 		return nil, errors.New("Required attribute missing")
 	}
 
-	obj = d.Get("Subtype")
+	obj := d.Get("Subtype")
 	if obj == nil {
 		common.Log.Debug("Incompatibility ERROR: Subtype (Required) missing")
 		return nil, errors.New("Required attribute missing")
@@ -81,7 +96,7 @@ func newPdfFontFromPdfObject(obj core.PdfObject) (*PdfFont, error) {
 
 	switch subtype.String() {
 	case "TrueType":
-		truefont, err := newPdfFontTrueTypeFromPdfObject(obj)
+		truefont, err := newPdfFontTrueTypeFromPdfObject(fontObj)
 		if err != nil {
 			common.Log.Debug("Error loading truetype font: %v", truefont)
 			return nil, err
@@ -91,6 +106,24 @@ func newPdfFontFromPdfObject(obj core.PdfObject) (*PdfFont, error) {
 	default:
 		common.Log.Debug("Unsupported font type: %s", subtype.String())
 		return nil, errors.New("Unsupported font type")
+	}
+
+	obj = d.Get("Encoding")
+	if obj == nil {
+		common.Log.Debug("Incompatibility ERROR: Encoding (Required) missing")
+		return nil, errors.New("Required attribute missing")
+	}
+	encoding, ok := core.TraceToDirectObject(obj).(*core.PdfObjectName)
+	if !ok {
+		common.Log.Debug("Incompatibility ERROR: encoding not a name (%T) ", obj)
+		return nil, errors.New("Type check error")
+	}
+	switch encoding.String() {
+	case "WinAnsiEncoding":
+		font.SetEncoder(textencoding.NewWinAnsiTextEncoder())
+	default:
+		common.Log.Debug("Unsupported Encoding: %s", encoding.String())
+		return nil, errors.New("Unsupported font Encoding")
 	}
 
 	return font, nil
@@ -139,6 +172,7 @@ func (font pdfFontTrueType) GetGlyphCharMetrics(glyph string) (fonts.CharMetrics
 	if !found {
 		return metrics, false
 	}
+	metrics.GlyphName = glyph
 
 	if int(code) < font.firstChar {
 		common.Log.Debug("Code lower than firstchar (%d < %d)", code, font.firstChar)

@@ -635,6 +635,7 @@ func (m *Matrix) Concat(b Matrix) {
 }
 
 // Translate appends a translation of `dx`,`dy` to `m`
+// m.Translate(dx, dy) is equivalent to m.Concat(NewMatrix(1, 0, 0, 1, dx, dy))
 func (m *Matrix) Translate(dx, dy float64) {
 	m[6] += dx
 	m[7] += dy
@@ -649,6 +650,7 @@ func (m *Matrix) Transform(x, y float64) (float64, float64) {
 }
 
 // pageOrientation returns a guess at the pdf page orientation when text is printed with CTM `m`
+// XXX: Use pageRotate flag instead !@#$
 func (m *Matrix) pageOrientation() Orientation {
 	switch {
 	case m[1]*m[1]+m[3]*m[3] > m[0]*m[0]+m[4]*m[4]:

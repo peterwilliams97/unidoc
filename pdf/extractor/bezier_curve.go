@@ -50,7 +50,8 @@ func (curve *CubicBezierCurve) transformByMatrix(m contentstream.Matrix) {
 
 // String returns a string describing `curve`
 func (curve *CubicBezierCurve) String() string {
-	return fmt.Sprintf("P0:%s,P1:%s,P2:%s,P3:%s", curve.P0, curve.P1, curve.P2, curve.P3)
+	return fmt.Sprintf("P0:%s,P1:%s,P2:%s,P3:%s",
+		curve.P0.String(), curve.P1.String(), curve.P2.String(), curve.P3.String())
 }
 
 // GetBoundingBox returns the bounding box of `curve`.

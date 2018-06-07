@@ -20,7 +20,9 @@ import (
 	"github.com/unidoc/unidoc/common"
 	"github.com/unidoc/unidoc/pdf/contentstream" // Import all? !@#$
 	"github.com/unidoc/unidoc/pdf/core"
+	"github.com/unidoc/unidoc/pdf/internal/cmap"
 	"github.com/unidoc/unidoc/pdf/model"
+	"github.com/unidoc/unidoc/pdf/model/fonts"
 )
 
 // ExtractText processes and extracts all text data in content streams and returns as a string.
@@ -64,7 +66,7 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 				if to != nil {
 					common.Log.Debug("BT called while in a text object")
 				}
-				to = newTextObject(&state)
+				to = newTextObject(e, &state)
 			case "ET": // End Text
 				*textList = append(*textList, to.Texts...)
 				to = nil
@@ -255,7 +257,7 @@ func (to *TextObject) setTextMatrix(f []float64) {
 
 // showText "Tj" Show a text string
 func (to *TextObject) showText(text string) error {
-	to.emitText(text)
+	to.renderText(text)
 	return nil
 }
 
@@ -280,7 +282,7 @@ func (to *TextObject) showTextAdjusted(params []core.PdfObject) error {
 				common.Log.Debug("showTextAdjusted params=%+v err=%v", params, err)
 				return err
 			}
-			to.emitText(text)
+			to.renderText(text)
 		}
 	}
 	return nil
@@ -298,6 +300,13 @@ func (to *TextObject) setCharSpacing(x float64) {
 
 // setFont "Tf" Set font
 func (to *TextObject) setFont(name string, size float64) error {
+	font, err := to.getFont(name)
+	if err != nil {
+		return err
+	}
+	to.State.Tf = font
+	to.State.Tfs = size
+	to.testFont(name)
 	return nil
 }
 
@@ -363,13 +372,14 @@ type TextState struct {
 	Tfs   float64    // Text font size
 	Tmode RenderMode // Text rendering mode
 	Trise float64    // Text rise. Unscaled text space units. Set by Ts
+	Tf    *model.PdfFont
 	// Tk    bool                 // Text knockout. Not used for now
 	// Tf Text font
 }
 
 // 9.4.1 General (page 248)
 // A PDF text object consists of operators that may show text strings, move the text position, and
-// set text state and certain other parameters. In addition, three parameters may be specified only
+// set text state and certain other parameters. In addition, two parameters may be specified only
 // within a text object and shall not persist from one text object to the next:
 //   •Tm, the text matrix
 //   •Tlm, the text line matrix
@@ -380,6 +390,7 @@ type TextState struct {
 //        | 0         Trise   1 |
 //
 type TextObject struct {
+	e     *Extractor
 	State *TextState
 	Tm    contentstream.Matrix // Text matrix. For the character pointer.
 	Tlm   contentstream.Matrix // Text line matrix. For the start of line pointer.
@@ -387,6 +398,7 @@ type TextObject struct {
 }
 
 // newTextState returns a default TextState
+//
 func newTextState() TextState {
 	return TextState{
 		Th:    100,
@@ -395,33 +407,25 @@ func newTextState() TextState {
 }
 
 // newTextObject returns a default TextObject
-func newTextObject(state *TextState) *TextObject {
+func newTextObject(e *Extractor, state *TextState) *TextObject {
 	return &TextObject{
+		e:     e,
 		State: state,
 		Tm:    contentstream.IdentityMatrix(),
 		Tlm:   contentstream.IdentityMatrix(),
 	}
 }
 
-func (to *TextObject) textTransform(x, y float64) (float64, float64) {
-	return to.Tm.Transform(x, y)
-}
-
-// textMatrixTranslate translates the text matrix by `dx`,`dy`
-func (to *TextObject) textMatrixTranslate(dx, dy float64) {
-	to.Tm.Translate(dx, dy)
-}
-
-// emitText emits `text` to the calling program
-func (to *TextObject) emitText(text string) {
-	fmt.Printf("emitText: %q\n", text)
+// renderText emits `text` to the calling program
+func (to *TextObject) renderText(text string) {
+	fmt.Printf("renderText: %q\n", text)
 	to.Texts = append(to.Texts, XYText{Text: text})
 }
 
-// moveTo moves the start of line pointer `Line` by `tx`,`ty` and sets the text pointer to the
+// moveTo moves the start of line pointer by `tx`,`ty` and sets the text pointer to the
 // start of line pointer
 // Move to the start of the next line, offset from the start of the current line by (tx, ty).
-// tx and ty are in unscaled text space units.
+// `tx` and `ty` are in unscaled text space units.
 func (to *TextObject) moveTo(tx, ty float64) {
 	to.Tlm.Concat(contentstream.NewMatrix(1, 0, 0, 1, tx, ty))
 	to.Tm = to.Tlm
@@ -429,9 +433,9 @@ func (to *TextObject) moveTo(tx, ty float64) {
 
 // Text list
 
-// XYText represents text and its position on a page
+// XYText represents text and its position in device coordinates
 type XYText struct { // !@#$ Text
-	X, Y             float64        // !@#$ Point
+	Point
 	ColorStroking    model.PdfColor // Colour that text is stroked with, if any
 	ColorNonStroking model.PdfColor // Colour that text is filled with, if any
 	Orient           contentstream.Orientation
@@ -444,21 +448,21 @@ func (t *XYText) String() string {
 		t.X, t.Y, t.ColorStroking, t.ColorNonStroking, t.Orient, chomp(t.Text, 100))
 }
 
-// TextList is a list of text and its position on a pdf page
+// TextList is a list of texts and their position on a pdf page
 type TextList []XYText
 
 func (tl *TextList) Length() int {
 	return len(*tl)
 }
 
-// AppendText appends the location and position of `text` to a text list
+// AppendText appends the location and contents of `text` to a text list
 func (tl *TextList) AppendText(gs contentstream.GraphicsState, p Point, text string) {
-	t := XYText{p.X, p.Y, gs.ColorStroking, gs.ColorNonStroking, gs.PageOrientation(), text}
+	t := XYText{p, gs.ColorStroking, gs.ColorNonStroking, gs.PageOrientation(), text}
 	common.Log.Debug("AppendText: %s", t.String())
 	*tl = append(*tl, t)
 }
 
-// ToText returns the contents of tl as a single string
+// ToText returns the contents of `tl` as a single string
 func (tl *TextList) ToText() string {
 	var buf bytes.Buffer
 	for _, t := range *tl {
@@ -480,6 +484,8 @@ func (tl *TextList) SortPosition() {
 	})
 }
 
+// PageOrientation is a heuristic for the orientation of a page
+// XXX: Use Page's Rotate flag instead 12#$
 func (tl *TextList) PageOrientation() contentstream.Orientation {
 	landscapeCount := 0
 	for _, t := range *tl {
@@ -488,8 +494,6 @@ func (tl *TextList) PageOrientation() contentstream.Orientation {
 		}
 	}
 	portraitCount := len(*tl) - landscapeCount
-	// fmt.Printf("PageOrientation: landscape=%.1f%% = %d / %d \n",
-	//  float64(landscapeCount)/float64(len(*tl))*100.0, landscapeCount, len(*tl))
 	if landscapeCount > portraitCount {
 		return contentstream.OrientationLandscape
 	}
@@ -499,51 +503,103 @@ func (tl *TextList) PageOrientation() contentstream.Orientation {
 // Transform transforms all points in `tl` by the affine transformation a, b, c, d, tx, ty
 func (tl *TextList) Transform(a, b, c, d, tx, ty float64) {
 	m := contentstream.NewMatrix(a, b, c, d, tx, ty)
-	// fmt.Println("^^^^^^^^^^^$$$$$$$$$^^^^^^^^^^^^^^^^")
 	for _, t := range *tl {
 		t.X, t.Y = m.Transform(t.X, t.Y)
-		// fmt.Printf("%4d: %s\n", i, t)
 	}
-	// fmt.Println("^^^^^^^^^^^#########^^^^^^^^^^^^^^^^^")
 }
 
-// func getCodemap(resources *model.PdfPageResources, op *contentstream.ContentStreamOperation) (codemap *cmap.CMap, err error) {
-//  fontName, ok := op.Params[0].(*core.PdfObjectName)
-//  if !ok {
-//      err = errors.New("Tf range error")
-//      common.Log.Debug("Error Tf font input not a name")
-//      return
-//  }
-//  if resources == nil {
-//      return
-//  }
+func (to *TextObject) getCodemap(name string) (codemap *cmap.CMap, err error) {
 
-//  fontObj, found := resources.GetFontByName(*fontName)
-//  if !found {
-//      err = errors.New("Font not in resources")
-//      common.Log.Debug("Font not found...")
-//      return
-//  }
+	fontObj, err := to.getFontDict(name)
+	if err != nil {
+		return
+	}
+	fontDict := fontObj.(*core.PdfObjectDictionary)
+	toUnicode := fontDict.Get("ToUnicode")
+	toUnicode = core.TraceToDirectObject(toUnicode)
+	if toUnicode == nil {
+		return
+	}
+	toUnicodeStream, ok := toUnicode.(*core.PdfObjectStream)
+	if !ok {
+		err = errors.New("Invalid ToUnicode entry - not a stream")
+		return
+	}
+	var decoded []byte
+	decoded, err = core.DecodeStream(toUnicodeStream)
+	if err != nil {
+		return
+	}
+	codemap, err = cmap.LoadCmapFromData(decoded)
+	return
+}
 
-//  fontObj = core.TraceToDirectObject(fontObj)
-//  if fontDict, isDict := fontObj.(*core.PdfObjectDictionary); isDict {
-//      toUnicode := fontDict.Get("ToUnicode")
-//      if toUnicode != nil {
-//          toUnicode = core.TraceToDirectObject(toUnicode)
-//          toUnicodeStream, ok := toUnicode.(*core.PdfObjectStream)
-//          if !ok {
-//              return errors.New("Invalid ToUnicode entry - not a stream")
-//          }
-//          var decoded []byte
-//          decoded, err = core.DecodeStream(toUnicodeStream)
-//          if err != nil {
-//              return
-//          }
-//          codemap, err = cmap.LoadCmapFromData(decoded)
-//          if err != nil {
-//              return
-//          }
-//      }
-//  }
-//  return
-// }
+// getFont returns the font named `name` if it exists in the page's resources
+func (to *TextObject) getFont(name string) (*model.PdfFont, error) {
+	fontObj, err := to.getFontDict(name)
+	if err != nil {
+		return nil, err
+	}
+	font, err := model.NewPdfFontFromPdfObject(fontObj)
+	if err != nil {
+		common.Log.Debug("getFont: NewPdfFontFromPdfObject failed. name=%#q err=%v", name, err)
+	}
+	return font, err
+}
+
+// testing function:
+// XXX move this to a go test
+func (to *TextObject) testFont(name string) {
+	font, err := to.getFont(name)
+	if err != nil {
+		panic(err)
+	}
+	text := "^`_-|WjāXYZabc123ABCDEFG"
+	metrics, err := getCharMetrics(font, text)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("=====================================")
+	fmt.Printf("font=%#q text=%q\n", name, text)
+	fmt.Printf("metrics=%+v\n", metrics)
+}
+
+// getCharMetrics returns the character metrics for the code points in `text1` for font `font`
+func getCharMetrics(font *model.PdfFont, text string) (metrics []fonts.CharMetrics, err error) {
+	encoder := font.GetEncoder()
+	if encoder == nil {
+		err = errors.New("No font encoder")
+	}
+	for _, r := range text {
+		glyph, found := encoder.RuneToGlyph(r)
+		if !found {
+			common.Log.Debug("Error! Glyph not found for rune=%s", r)
+			glyph = "space"
+		}
+		m, ok := font.GetGlyphCharMetrics(glyph)
+		if !ok {
+			common.Log.Debug("Error! Metrics not found for rune=%+v glyph=%#q", r, glyph)
+		}
+		metrics = append(metrics, m)
+	}
+	return
+}
+
+// getFontDict returns the font object called `name` if it exists in the page's Font resources or
+// an error if it doesn't
+func (to *TextObject) getFontDict(name string) (fontObj core.PdfObject, err error) {
+	resources := to.e.resources
+	if resources == nil {
+		common.Log.Debug("getFontDict: No resouces")
+		return
+	}
+
+	fontObj, found := resources.GetFontByName(core.PdfObjectName(name))
+	if !found {
+		err = errors.New("Font not in resources")
+		common.Log.Debug("getFontDict: Font not found: name=%q err=%v", name, err)
+		return
+	}
+	fontObj = core.TraceToDirectObject(fontObj)
+	return
+}
