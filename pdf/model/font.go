@@ -7,7 +7,6 @@ package model
 
 import (
 	"errors"
-
 	"io/ioutil"
 
 	"github.com/unidoc/unidoc/common"
@@ -29,7 +28,7 @@ type PdfFont struct {
 func (font PdfFont) SetEncoder(encoder textencoding.TextEncoder) {
 	switch t := font.context.(type) {
 	case *pdfFontTrueType:
-		t.Encoder = encoder
+		t.SetEncoder(encoder)
 	default:
 		common.Log.Debug("SetEncoder. Not implemented for font type=%#T", font.context)
 	}
@@ -161,7 +160,7 @@ type pdfFontTrueType struct {
 	container *core.PdfIndirectObject
 }
 
-func (font pdfFontTrueType) SetEncoder(encoder textencoding.TextEncoder) {
+func (font *pdfFontTrueType) SetEncoder(encoder textencoding.TextEncoder) {
 	font.Encoder = encoder
 }
 
