@@ -88,24 +88,6 @@ func toFloatList(objs []core.PdfObject) ([]float64, error) {
 	return floats, nil
 }
 
-func getString(obj core.PdfObject) (string, error) {
-	if s, ok := obj.(*core.PdfObjectString); ok {
-		return string(*s), nil
-	}
-	err := errors.New("Not a string")
-	common.Log.Debug("getString: obj=%T %s err=%v", obj, obj.String(), err)
-	return "", err
-}
-
-func getName(obj core.PdfObject) (string, error) {
-	if s, ok := obj.(*core.PdfObjectName); ok {
-		return string(*s), nil
-	}
-	err := errors.New("Not a name")
-	common.Log.Debug("getName: obj=%T %s err=%v", obj, obj.String(), err)
-	return "", err
-}
-
 // getNumberAsFloat can retrieve numeric values from PdfObject (both integer/float).
 func getNumberAsFloat(obj core.PdfObject) (float64, error) {
 	// return model.GetNumberAsFloat(obj)

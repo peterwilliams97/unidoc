@@ -11,6 +11,7 @@ import (
 
 	"github.com/unidoc/unidoc/common"
 	"github.com/unidoc/unidoc/pdf/core"
+	"github.com/unidoc/unidoc/pdf/internal/cmap"
 	"github.com/unidoc/unidoc/pdf/model/fonts"
 	"github.com/unidoc/unidoc/pdf/model/textencoding"
 )
@@ -40,6 +41,36 @@ func (font PdfFont) GetEncoder() textencoding.TextEncoder {
 		return t.Encoder
 	default:
 		common.Log.Debug("GetEncoder. Not implemented for font type=%#T", font.context)
+		// XXX: Should we return a default encoding?
+	}
+	return nil
+}
+
+func (font PdfFont) CharcodeBytesToUnicode(codes []byte) string {
+	if codemap := font.GetCMap(); codemap != nil {
+		return codemap.CharcodeBytesToUnicode(codes)
+	} else if encoder := font.GetEncoder(); encoder != nil {
+		runes := []rune{}
+		for _, c := range codes {
+			r, ok := encoder.CharcodeToRune(c)
+			if !ok {
+				r = '?'
+			}
+			runes = append(runes, r)
+		}
+		return string(runes)
+	}
+	common.Log.Debug("CharcodeBytesToUnicode. Couldn't covert. Returning input bytes")
+
+	return string(codes)
+}
+
+func (font PdfFont) GetCMap() *cmap.CMap {
+	switch t := font.context.(type) {
+	case *pdfFontTrueType:
+		return t.CMap
+	default:
+		common.Log.Debug("GetCMap. Not implemented for font type=%#T", font.context)
 		// XXX: Should we return a default encoding?
 	}
 	return nil
@@ -108,24 +139,70 @@ func NewPdfFontFromPdfObject(fontObj core.PdfObject) (*PdfFont, error) {
 	}
 
 	obj = d.Get("Encoding")
-	if obj == nil {
-		common.Log.Debug("Incompatibility ERROR: Encoding (Required) missing")
-		return nil, errors.New("Required attribute missing")
+	baseEncoder, differences, err := getFontEncoding(obj)
+	if err != nil {
+		panic(err)
+		return nil, err
 	}
-	encoding, ok := core.TraceToDirectObject(obj).(*core.PdfObjectName)
-	if !ok {
-		common.Log.Debug("Incompatibility ERROR: encoding not a name (%T) ", obj)
-		return nil, errors.New("Type check error")
+	encoder, err := textencoding.NewSimpleTextEncoder(baseEncoder, differences)
+	if err != nil {
+		return nil, err
 	}
-	switch encoding.String() {
-	case "WinAnsiEncoding":
-		font.SetEncoder(textencoding.NewWinAnsiTextEncoder())
-	default:
-		common.Log.Debug("Unsupported Encoding: %s", encoding.String())
-		return nil, errors.New("Unsupported font Encoding")
-	}
-
+	font.SetEncoder(encoder)
 	return font, nil
+}
+
+// getFontEncoding returns font encoding of `obj` the "Encoding" entry in a font dict
+// Table 114 – Entries in an encoding dictionary (page 263)
+func getFontEncoding(obj core.PdfObject) (string, map[byte]string, error) {
+	if obj == nil {
+		common.Log.Debug("Incompatibility ERROR: Font Encoding (Required) missing")
+		return "", nil, errors.New("Required attribute missing")
+	}
+	obj = core.TraceToDirectObject(obj)
+
+	switch encoding := obj.(type) {
+	case *core.PdfObjectName:
+		return string(*encoding), nil, nil
+	case *core.PdfObjectDictionary:
+		typ, err := core.GetName(encoding.Get("Type"))
+		if err != nil || typ != "Encoding" {
+			common.Log.Debug("Incompatibility ERROR: Bad font encoding dict. %+v Type=%q err=%v",
+				encoding, typ, err)
+			return "", nil, errors.New("Type check error")
+		}
+		baseName, err := core.GetName(encoding.Get("BaseEncoding"))
+		if err != nil {
+			common.Log.Debug("Incompatibility ERROR: Bad font encoding dict. %+v BaseEncoding=%q err=%v",
+				encoding, baseName, err)
+			return "", nil, errors.New("Type check error")
+		}
+		diffList, err := core.GetArray(encoding.Get("Differences"))
+		if err != nil {
+			common.Log.Debug("Incompatibility ERROR: Bad font encoding dict. %+v err=%v", encoding, err)
+			return "", nil, errors.New("Type check error")
+		}
+
+		differences := map[byte]string{}
+		var n byte
+		for _, obj := range diffList {
+			switch v := obj.(type) {
+			case *core.PdfObjectInteger:
+				n = byte(*v)
+			case *core.PdfObjectName:
+				s := string(*v)
+				differences[n] = s
+				n++
+			default:
+				common.Log.Debug("Bad type. obj=%s", obj)
+				return "", nil, errors.New("Type check error")
+			}
+		}
+		return baseName, differences, nil
+	default:
+		common.Log.Debug("Incompatibility ERROR: encoding not a name or dict (%T) ", obj)
+		return "", nil, errors.New("Type check error")
+	}
 }
 
 func (font PdfFont) ToPdfObject() core.PdfObject {
@@ -156,6 +233,7 @@ type pdfFontTrueType struct {
 	FontDescriptor *PdfFontDescriptor
 	Encoding       core.PdfObject
 	ToUnicode      core.PdfObject
+	CMap           *cmap.CMap
 
 	container *core.PdfIndirectObject
 }
@@ -286,14 +364,33 @@ func newPdfFontTrueTypeFromPdfObject(obj core.PdfObject) (*pdfFontTrueType, erro
 			common.Log.Debug("Error loading font descriptor: %v", err)
 			return nil, err
 		}
-
 		font.FontDescriptor = descriptor
 	}
 
-	font.Encoding = d.Get("Encoding")
-	font.ToUnicode = d.Get("ToUnicode")
+	font.Encoding = core.TraceToDirectObject(d.Get("Encoding"))
+	font.ToUnicode = core.TraceToDirectObject(d.Get("ToUnicode"))
 
+	if font.ToUnicode != nil {
+		codemap, err := toUnicodeToCmap(font.ToUnicode)
+		if err != nil {
+			return nil, err
+		}
+		font.CMap = codemap
+	}
 	return font, nil
+}
+
+func toUnicodeToCmap(toUnicode core.PdfObject) (*cmap.CMap, error) {
+	toUnicodeStream, ok := toUnicode.(*core.PdfObjectStream)
+	if !ok {
+		common.Log.Debug("toUnicodeToCmap: Not a stream (%T)", toUnicode)
+		return nil, errors.New("Invalid ToUnicode entry - not a stream")
+	}
+	decoded, err := core.DecodeStream(toUnicodeStream)
+	if err != nil {
+		return nil, err
+	}
+	return cmap.LoadCmapFromData(decoded)
 }
 
 func (this *pdfFontTrueType) ToPdfObject() core.PdfObject {

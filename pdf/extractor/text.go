@@ -1,13 +1,7 @@
 /*
  * This file is subject to the terms and conditions defined in
  * file 'LICENSE.md', which is part of this source code package.
- *
- * TODO:
-    `'`:   Move to next line and show text
-    `\`:  Set word and character spacing, move to next line, and show text
-    XObject Forms
-    Call this and the other extractors at the same time
-*/
+ */
 
 package extractor
 
@@ -66,7 +60,7 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 				if to != nil {
 					common.Log.Debug("BT called while in a text object")
 				}
-				to = newTextObject(e, &state)
+				to = newTextObject(e, gs, &state)
 			case "ET": // End Text
 				*textList = append(*textList, to.Texts...)
 				to = nil
@@ -94,7 +88,7 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 				if ok, err := checkOp(op, to, 1, true); !ok {
 					return err
 				}
-				text, err := getString(op.Params[0])
+				text, err := core.GetString(op.Params[0])
 				if err != nil {
 					return err
 				}
@@ -103,12 +97,16 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 				if ok, err := checkOp(op, to, 1, true); !ok {
 					return err
 				}
-				return to.showTextAdjusted(op.Params)
+				args, err := core.GetArray(op.Params[0])
+				if err != nil {
+					return err
+				}
+				return to.showTextAdjusted(args)
 			case "'": // Move to next line and show text
 				if ok, err := checkOp(op, to, 1, true); !ok {
 					return err
 				}
-				text, err := getString(op.Params[0])
+				text, err := core.GetString(op.Params[0])
 				if err != nil {
 					return err
 				}
@@ -122,7 +120,7 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 				if err != nil {
 					return err
 				}
-				text, err := getString(op.Params[2])
+				text, err := core.GetString(op.Params[2])
 				if err != nil {
 					return err
 				}
@@ -146,7 +144,7 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 				if ok, err := checkOp(op, to, 2, true); !ok {
 					return err
 				}
-				name, err := getName(op.Params[0])
+				name, err := core.GetName(op.Params[0])
 				if err != nil {
 					return err
 				}
@@ -262,9 +260,9 @@ func (to *TextObject) showText(text string) error {
 }
 
 // showTextAdjusted "TJ" Show text with adjustable spacing
-func (to *TextObject) showTextAdjusted(params []core.PdfObject) error {
+func (to *TextObject) showTextAdjusted(args []core.PdfObject) error {
 	vertical := false
-	for _, o := range params {
+	for _, o := range args {
 		switch o.(type) {
 		case *core.PdfObjectFloat, *core.PdfObjectInteger:
 			x, err := getNumberAsFloat(o)
@@ -277,12 +275,15 @@ func (to *TextObject) showTextAdjusted(params []core.PdfObject) error {
 			}
 			to.Tm.Translate(dx, dy)
 		case *core.PdfObjectString:
-			text, err := getString(o)
+			text, err := core.GetString(o)
 			if err != nil {
-				common.Log.Debug("showTextAdjusted params=%+v err=%v", params, err)
+				common.Log.Debug("showTextAdjusted args=%+v err=%v", args, err)
 				return err
 			}
 			to.renderText(text)
+		default:
+			common.Log.Debug("showTextAdjusted. Unexpected type args=%+v", args)
+			return errors.New("typecheck")
 		}
 	}
 	return nil
@@ -306,7 +307,7 @@ func (to *TextObject) setFont(name string, size float64) error {
 	}
 	to.State.Tf = font
 	to.State.Tfs = size
-	to.testFont(name)
+	// to.testFont(name)
 	return nil
 }
 
@@ -365,16 +366,15 @@ func checkOp(op *contentstream.ContentStreamOperation, to *TextObject, numParams
 // be specified in a coordinate system that shall be defined by the text matrix, Tm but shall not be
 // scaled by the font size parameter, Tfs.
 type TextState struct {
-	Tc    float64    // Character spacing. Unscaled text space units.
-	Tw    float64    // Word spacing. Unscaled text space units.
-	Th    float64    // Horizontal scaling
-	Tl    float64    // Leading. Unscaled text space units. Used by TD,T*,'," see Table 108
-	Tfs   float64    // Text font size
-	Tmode RenderMode // Text rendering mode
-	Trise float64    // Text rise. Unscaled text space units. Set by Ts
-	Tf    *model.PdfFont
+	Tc    float64        // Character spacing. Unscaled text space units.
+	Tw    float64        // Word spacing. Unscaled text space units.
+	Th    float64        // Horizontal scaling
+	Tl    float64        // Leading. Unscaled text space units. Used by TD,T*,'," see Table 108
+	Tfs   float64        // Text font size
+	Tmode RenderMode     // Text rendering mode
+	Trise float64        // Text rise. Unscaled text space units. Set by Ts
+	Tf    *model.PdfFont // Text font
 	// Tk    bool                 // Text knockout. Not used for now
-	// Tf Text font
 }
 
 // 9.4.1 General (page 248)
@@ -391,6 +391,7 @@ type TextState struct {
 //
 type TextObject struct {
 	e     *Extractor
+	gs    contentstream.GraphicsState
 	State *TextState
 	Tm    contentstream.Matrix // Text matrix. For the character pointer.
 	Tlm   contentstream.Matrix // Text line matrix. For the start of line pointer.
@@ -398,7 +399,6 @@ type TextObject struct {
 }
 
 // newTextState returns a default TextState
-//
 func newTextState() TextState {
 	return TextState{
 		Th:    100,
@@ -407,9 +407,10 @@ func newTextState() TextState {
 }
 
 // newTextObject returns a default TextObject
-func newTextObject(e *Extractor, state *TextState) *TextObject {
+func newTextObject(e *Extractor, gs contentstream.GraphicsState, state *TextState) *TextObject {
 	return &TextObject{
 		e:     e,
+		gs:    gs,
 		State: state,
 		Tm:    contentstream.IdentityMatrix(),
 		Tlm:   contentstream.IdentityMatrix(),
@@ -417,9 +418,57 @@ func newTextObject(e *Extractor, state *TextState) *TextObject {
 }
 
 // renderText emits `text` to the calling program
+// see 9.10.3, "ToUnicode CMaps"), whose value shall be a stream object containing a special
 func (to *TextObject) renderText(text string) {
-	fmt.Printf("renderText: %q\n", text)
-	to.Texts = append(to.Texts, XYText{Text: text})
+	text0 := text
+	text = to.State.Tf.CharcodeBytesToUnicode([]byte(text))
+	cp := to.getCp()
+	fmt.Printf("renderText: %q->%q (%.1f,%.1f)\n", text0, text, cp.X, cp.Y)
+	to.Texts = append(to.Texts, XYText{Point: cp, Text: text})
+
+	// s := to.State
+	// fontSize := s.Tfs
+	// horizontalScaling := s.Th / 100.0
+	// charSpacing := s.Tc
+	// trm := contentstream.NewMatrix(s.Tfs*s.Th, 0, 0, s.Tfs, 0, s.Trise)
+	// trm.Concat(to.Tm)
+	// trm.Concat(to.gs.CTM)
+
+	// encoder := to.State.Tf.GetEncoder()
+	// for _, r := range text {
+	// 	wordSpacing := 0.0
+	// 	if r == ' ' {
+	// 		wordSpacing = s.Tw
+	// 	}
+	// 	// TODO: Handle vertical text
+
+	// 	glyph, found := encoder.RuneToGlyph(r)
+	// 	if !found {
+	// 		common.Log.Debug("Error! Glyph not found for rune=%s", r)
+	// 		glyph = "space"
+	// 	}
+
+	// 	metrics, ok := to.State.Tf.GetGlyphCharMetrics(glyph)
+	// 	if !ok {
+	// 		common.Log.Debug("Error! Metrics not found for rune=%+v glyph=%#q", r, glyph)
+	// 	}
+	// 	showGlyph(trm, font, r, metrics)
+
+	// }
+}
+
+// getCp returns the current text position in device coordinates
+//        | Tfs x Th   0      0 |
+// Trm  = | 0         Tfs     0 | × Tm × CTM
+//        | 0         Trise   1 |
+func (to *TextObject) getCp() Point {
+	s := to.State
+	m := contentstream.NewMatrix(s.Tfs*s.Th, 0, 0, s.Tfs, 0, s.Trise)
+	m.Concat(to.Tm)
+	m.Concat(to.gs.CTM)
+	cp := Point{}
+	x, y := m.Transform(cp.X, cp.Y)
+	return Point{x, y}
 }
 
 // moveTo moves the start of line pointer by `tx`,`ty` and sets the text pointer to the
@@ -547,26 +596,23 @@ func (to *TextObject) getFont(name string) (*model.PdfFont, error) {
 	return font, err
 }
 
-// testing function:
-// XXX move this to a go test
-func (to *TextObject) testFont(name string) {
-	font, err := to.getFont(name)
-	if err != nil {
-		common.Log.Debug("testFont: Font does not exist. name=%#q err=%v", name, err)
+// getFontDict returns the font object called `name` if it exists in the page's Font resources or
+// an error if it doesn't
+func (to *TextObject) getFontDict(name string) (fontObj core.PdfObject, err error) {
+	resources := to.e.resources
+	if resources == nil {
+		common.Log.Debug("getFontDict: No resouces")
 		return
 	}
-	text := "^`_-|WjāXYZabc123ABCDEFG"
-	metrics, err := getCharMetrics(font, text)
-	if err != nil {
-		if err != nil {
-			common.Log.Debug("testFont: getCharMetrics failed. name=%#q text=%q err=%v",
-				name, text, err)
-			return
-		}
+
+	fontObj, found := resources.GetFontByName(core.PdfObjectName(name))
+	if !found {
+		err = errors.New("Font not in resources")
+		common.Log.Debug("getFontDict: Font not found: name=%q err=%v", name, err)
+		return
 	}
-	fmt.Println("=====================================")
-	fmt.Printf("font=%#q text=%q\n", name, text)
-	fmt.Printf("metrics=%+v\n", metrics)
+	fontObj = core.TraceToDirectObject(fontObj)
+	return
 }
 
 // getCharMetrics returns the character metrics for the code points in `text1` for font `font`
@@ -590,21 +636,24 @@ func getCharMetrics(font *model.PdfFont, text string) (metrics []fonts.CharMetri
 	return
 }
 
-// getFontDict returns the font object called `name` if it exists in the page's Font resources or
-// an error if it doesn't
-func (to *TextObject) getFontDict(name string) (fontObj core.PdfObject, err error) {
-	resources := to.e.resources
-	if resources == nil {
-		common.Log.Debug("getFontDict: No resouces")
+// testing function:
+// XXX move this to a go test
+func (to *TextObject) testFont(name string) {
+	font, err := to.getFont(name)
+	if err != nil {
+		common.Log.Debug("testFont: Font does not exist. name=%#q err=%v", name, err)
 		return
 	}
-
-	fontObj, found := resources.GetFontByName(core.PdfObjectName(name))
-	if !found {
-		err = errors.New("Font not in resources")
-		common.Log.Debug("getFontDict: Font not found: name=%q err=%v", name, err)
-		return
+	text := "^`_-|WjāXYZabc123ABCDEFG"
+	metrics, err := getCharMetrics(font, text)
+	if err != nil {
+		if err != nil {
+			common.Log.Debug("testFont: getCharMetrics failed. name=%#q text=%q err=%v",
+				name, text, err)
+			return
+		}
 	}
-	fontObj = core.TraceToDirectObject(fontObj)
-	return
+	fmt.Println("=====================================")
+	fmt.Printf("font=%#q text=%q\n", name, text)
+	fmt.Printf("metrics=%+v\n", metrics)
 }

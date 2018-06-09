@@ -557,7 +557,7 @@ const TraceMaxDepth = 20
 func TraceToDirectObject(obj PdfObject) PdfObject {
 	iobj, isIndirectObj := obj.(*PdfIndirectObject)
 	depth := 0
-	for isIndirectObj == true {
+	for isIndirectObj {
 		obj = iobj.PdfObject
 		iobj, isIndirectObj = obj.(*PdfIndirectObject)
 		depth++
