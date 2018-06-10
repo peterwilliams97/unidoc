@@ -98,30 +98,30 @@ func NewPdfFontFromPdfObject(fontObj core.PdfObject) (*PdfFont, error) {
 	d, ok := dictObj.(*core.PdfObjectDictionary)
 	if !ok {
 		common.Log.Debug("Font not given by a dictionary (%T)", fontObj)
-		return nil, errors.New("Type check error")
+		return nil, ErrTypeError
 	}
 
 	if obj := d.Get("Type"); obj != nil {
 		oname, is := obj.(*core.PdfObjectName)
 		if !is || string(*oname) != "Font" {
 			common.Log.Debug("Incompatibility ERROR: Type (Required) defined but not Font name")
-			return nil, errors.New("Range check error")
+			return nil, ErrRangeError
 		}
 	} else {
 		common.Log.Debug("Incompatibility ERROR: Type (Required) missing")
-		return nil, errors.New("Required attribute missing")
+		return nil, ErrRequiredAttributeMissing
 	}
 
 	obj := d.Get("Subtype")
 	if obj == nil {
 		common.Log.Debug("Incompatibility ERROR: Subtype (Required) missing")
-		return nil, errors.New("Required attribute missing")
+		return nil, ErrRequiredAttributeMissing
 	}
 
 	subtype, ok := core.TraceToDirectObject(obj).(*core.PdfObjectName)
 	if !ok {
 		common.Log.Debug("Incompatibility ERROR: subtype not a name (%T) ", obj)
-		return nil, errors.New("Type check error")
+		return nil, ErrTypeError
 	}
 
 	switch subtype.String() {
@@ -157,7 +157,7 @@ func NewPdfFontFromPdfObject(fontObj core.PdfObject) (*PdfFont, error) {
 func getFontEncoding(obj core.PdfObject) (string, map[byte]string, error) {
 	if obj == nil {
 		common.Log.Debug("Incompatibility ERROR: Font Encoding (Required) missing")
-		return "", nil, errors.New("Required attribute missing")
+		return "", nil, ErrRequiredAttributeMissing
 	}
 	obj = core.TraceToDirectObject(obj)
 
@@ -169,39 +169,25 @@ func getFontEncoding(obj core.PdfObject) (string, map[byte]string, error) {
 		if err != nil || typ != "Encoding" {
 			common.Log.Debug("Incompatibility ERROR: Bad font encoding dict. %+v Type=%q err=%v",
 				encoding, typ, err)
-			return "", nil, errors.New("Type check error")
+			return "", nil, ErrTypeError
 		}
 		baseName, err := core.GetName(encoding.Get("BaseEncoding"))
 		if err != nil {
 			common.Log.Debug("Incompatibility ERROR: Bad font encoding dict. %+v BaseEncoding=%q err=%v",
 				encoding, baseName, err)
-			return "", nil, errors.New("Type check error")
+			return "", nil, ErrTypeError
 		}
 		diffList, err := core.GetArray(encoding.Get("Differences"))
 		if err != nil {
 			common.Log.Debug("Incompatibility ERROR: Bad font encoding dict. %+v err=%v", encoding, err)
-			return "", nil, errors.New("Type check error")
+			return "", nil, ErrTypeError
 		}
 
-		differences := map[byte]string{}
-		var n byte
-		for _, obj := range diffList {
-			switch v := obj.(type) {
-			case *core.PdfObjectInteger:
-				n = byte(*v)
-			case *core.PdfObjectName:
-				s := string(*v)
-				differences[n] = s
-				n++
-			default:
-				common.Log.Debug("Bad type. obj=%s", obj)
-				return "", nil, errors.New("Type check error")
-			}
-		}
-		return baseName, differences, nil
+		differences, err := textencoding.FromFontDifferences(diffList)
+		return baseName, differences, err
 	default:
 		common.Log.Debug("Incompatibility ERROR: encoding not a name or dict (%T) ", obj)
-		return "", nil, errors.New("Type check error")
+		return "", nil, ErrTypeError
 	}
 }
 
@@ -284,7 +270,7 @@ func newPdfFontTrueTypeFromPdfObject(obj core.PdfObject) (*pdfFontTrueType, erro
 	d, ok := obj.(*core.PdfObjectDictionary)
 	if !ok {
 		common.Log.Debug("Font object invalid, not a dictionary (%T)", obj)
-		return nil, errors.New("Type check error")
+		return nil, ErrTypeError
 	}
 
 	if obj := d.Get("Type"); obj != nil {
@@ -309,12 +295,12 @@ func newPdfFontTrueTypeFromPdfObject(obj core.PdfObject) (*pdfFontTrueType, erro
 		intVal, ok := core.TraceToDirectObject(obj).(*core.PdfObjectInteger)
 		if !ok {
 			common.Log.Debug("Invalid FirstChar type (%T)", obj)
-			return nil, errors.New("Type check error")
+			return nil, ErrTypeError
 		}
 		font.firstChar = int(*intVal)
 	} else {
 		common.Log.Debug("ERROR: FirstChar attribute missing")
-		return nil, errors.New("Required attribute missing")
+		return nil, ErrRequiredAttributeMissing
 	}
 
 	if obj := d.Get("LastChar"); obj != nil {
@@ -323,12 +309,12 @@ func newPdfFontTrueTypeFromPdfObject(obj core.PdfObject) (*pdfFontTrueType, erro
 		intVal, ok := core.TraceToDirectObject(obj).(*core.PdfObjectInteger)
 		if !ok {
 			common.Log.Debug("Invalid LastChar type (%T)", obj)
-			return nil, errors.New("Type check error")
+			return nil, ErrTypeError
 		}
 		font.lastChar = int(*intVal)
 	} else {
 		common.Log.Debug("ERROR: FirstChar attribute missing")
-		return nil, errors.New("Required attribute missing")
+		return nil, ErrRequiredAttributeMissing
 	}
 
 	font.charWidths = []float64{}
@@ -338,7 +324,7 @@ func newPdfFontTrueTypeFromPdfObject(obj core.PdfObject) (*pdfFontTrueType, erro
 		arr, ok := core.TraceToDirectObject(obj).(*core.PdfObjectArray)
 		if !ok {
 			common.Log.Debug("Widths attribute != array (%T)", arr)
-			return nil, errors.New("Type check error")
+			return nil, ErrTypeError
 		}
 
 		widths, err := arr.ToFloat64Array()
@@ -349,13 +335,13 @@ func newPdfFontTrueTypeFromPdfObject(obj core.PdfObject) (*pdfFontTrueType, erro
 
 		if len(widths) != (font.lastChar - font.firstChar + 1) {
 			common.Log.Debug("Invalid widths length != %d (%d)", font.lastChar-font.firstChar+1, len(widths))
-			return nil, errors.New("Range check error")
+			return nil, ErrRangeError
 		}
 
 		font.charWidths = widths
 	} else {
 		common.Log.Debug("Widths missing from font")
-		return nil, errors.New("Required attribute missing")
+		return nil, ErrRequiredAttributeMissing
 	}
 
 	if obj := d.Get("FontDescriptor"); obj != nil {
@@ -478,7 +464,7 @@ func NewPdfFontFromTTFFile(filePath string) (*PdfFont, error) {
 
 	if len(vals) < (255 - 32 + 1) {
 		common.Log.Debug("Invalid length of widths, %d < %d", len(vals), 255-32+1)
-		return nil, errors.New("Range check error")
+		return nil, ErrRangeError
 	}
 
 	truefont.charWidths = vals[:255-32+1]
@@ -583,7 +569,7 @@ func newPdfFontDescriptorFromPdfObject(obj core.PdfObject) (*PdfFontDescriptor, 
 	d, ok := obj.(*core.PdfObjectDictionary)
 	if !ok {
 		common.Log.Debug("FontDescriptor not given by a dictionary (%T)", obj)
-		return nil, errors.New("Type check error")
+		return nil, ErrTypeError
 	}
 
 	if obj := d.Get("Type"); obj != nil {

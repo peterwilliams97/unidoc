@@ -277,7 +277,7 @@ func (this *PdfFunctionType0) ToPdfObject() PdfObject {
 func (this *PdfFunctionType0) Evaluate(x []float64) ([]float64, error) {
 	if len(x) != this.NumInputs {
 		common.Log.Error("Number of inputs not matching what is needed")
-		return nil, errors.New("Range check error")
+		return nil, ErrRangeError
 	}
 
 	if this.data == nil {
@@ -390,14 +390,14 @@ func newPdfFunctionType2FromPdfObject(obj PdfObject) (*PdfFunctionType2, error) 
 	if indObj, is := obj.(*PdfIndirectObject); is {
 		d, ok := indObj.PdfObject.(*PdfObjectDictionary)
 		if !ok {
-			return nil, errors.New("Type check error")
+			return nil, ErrTypeError
 		}
 		fun.container = indObj
 		dict = d
 	} else if d, is := obj.(*PdfObjectDictionary); is {
 		dict = d
 	} else {
-		return nil, errors.New("Type check error")
+		return nil, ErrTypeError
 	}
 
 	common.Log.Trace("FUNC2: %s", dict.String())
@@ -580,14 +580,14 @@ func newPdfFunctionType3FromPdfObject(obj PdfObject) (*PdfFunctionType3, error) 
 	if indObj, is := obj.(*PdfIndirectObject); is {
 		d, ok := indObj.PdfObject.(*PdfObjectDictionary)
 		if !ok {
-			return nil, errors.New("Type check error")
+			return nil, ErrTypeError
 		}
 		fun.container = indObj
 		dict = d
 	} else if d, is := obj.(*PdfObjectDictionary); is {
 		dict = d
 	} else {
-		return nil, errors.New("Type check error")
+		return nil, ErrTypeError
 	}
 
 	// Domain

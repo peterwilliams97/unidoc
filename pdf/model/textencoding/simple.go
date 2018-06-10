@@ -7,22 +7,28 @@ package textencoding
 
 import (
 	"errors"
+	"sort"
 
 	"github.com/unidoc/unidoc/common"
 	"github.com/unidoc/unidoc/pdf/core"
 )
 
+var (
+	ErrTypeError = errors.New("Type check error")
+)
+
 // SimpleEncoder represents a 1 byte encoding
 type SimpleEncoder struct {
-	name        string
+	baseName    string
+	differences map[byte]string
 	codeToGlyph map[byte]string
 	glyphToCode map[string]byte
 }
 
-func NewSimpleTextEncoder(name string, differences map[byte]string) (SimpleEncoder, error) {
-	baseEncoding, ok := simpleEncodings[name]
+func NewSimpleTextEncoder(baseName string, differences map[byte]string) (SimpleEncoder, error) {
+	baseEncoding, ok := simpleEncodings[baseName]
 	if !ok {
-		common.Log.Debug("Error: NewSimpleTextEncoder. Unknown encoding %q", name)
+		common.Log.Debug("Error: NewSimpleTextEncoder. Unknown encoding %q", baseName)
 		return SimpleEncoder{}, errors.New("Unsupported font encoding")
 	}
 	codeToRune := map[byte]rune{}
@@ -36,11 +42,7 @@ func NewSimpleTextEncoder(name string, differences map[byte]string) (SimpleEncod
 			}
 		}
 	}
-	return makeEncoder(name, codeToRune), nil
-}
-
-func (se SimpleEncoder) ToPdfObject() core.PdfObject {
-	return core.MakeName(se.name)
+	return makeEncoder(baseName, codeToRune), nil
 }
 
 // Convert a raw unicode string (series of runes) to an encoded string (series of character codes) to
@@ -125,7 +127,21 @@ func (se SimpleEncoder) GlyphToRune(glyph string) (rune, bool) {
 	return glyphToRune(glyph, glyphlistGlyphToRuneMap)
 }
 
-func makeEncoder(name string, codes map[byte]rune) SimpleEncoder {
+// ToPdfObject returns `se` as a PdfObject
+func (se SimpleEncoder) ToPdfObject() core.PdfObject {
+	if se.differences == nil {
+		return core.MakeName(se.baseName)
+	}
+	dict := core.MakeDict()
+	dict.Set("Type", core.MakeName("Encoding"))
+	dict.Set("BaseEncoding", core.MakeName(se.baseName))
+	dict.Set("Differences", core.MakeArray(ToFontDifferences(se.differences)...))
+
+	// Return an empty Encoding object
+	return core.MakeIndirectObject(dict)
+}
+
+func makeEncoder(baseName string, codes map[byte]rune) SimpleEncoder {
 	codeToGlyph := map[byte]string{}
 	glyphToCode := map[string]byte{}
 	for b, code := range codes {
@@ -134,10 +150,55 @@ func makeEncoder(name string, codes map[byte]rune) SimpleEncoder {
 		glyphToCode[g] = b
 	}
 	return SimpleEncoder{
-		name:        name,
+		baseName:    baseName,
 		codeToGlyph: codeToGlyph,
 		glyphToCode: glyphToCode,
 	}
+}
+
+func FromFontDifferences(diffList []core.PdfObject) (map[byte]string, error) {
+	differences := map[byte]string{}
+	var n byte
+	for _, obj := range diffList {
+		switch v := obj.(type) {
+		case *core.PdfObjectInteger:
+			n = byte(*v)
+		case *core.PdfObjectName:
+			s := string(*v)
+			differences[n] = s
+			n++
+		default:
+			common.Log.Debug("Bad type. obj=%s", obj)
+			return nil, ErrTypeError
+		}
+	}
+	return differences, nil
+}
+
+func ToFontDifferences(differences map[byte]string) []core.PdfObject {
+	if len(differences) == 0 {
+		return []core.PdfObject{}
+	}
+
+	codes := []byte{}
+	for c := range differences {
+		codes = append(codes, c)
+	}
+	sort.Slice(codes, func(i, j int) bool {
+		return codes[i] < codes[j]
+	})
+
+	n := codes[0]
+	diffList := []core.PdfObject{core.MakeInteger(int64(n)), core.MakeName(differences[n])}
+	for _, c := range codes[1:] {
+		if c == n+1 {
+			diffList = append(diffList, core.MakeName(differences[c]))
+		} else {
+			diffList = append(diffList, core.MakeInteger(int64(c)))
+		}
+		n = c
+	}
+	return diffList
 }
 
 var simpleEncodings = map[string]map[byte]rune{

@@ -310,7 +310,7 @@ func newPdfShadingType1FromDictionary(dict *PdfObjectDictionary) (*PdfShadingTyp
 		arr, ok := obj.(*PdfObjectArray)
 		if !ok {
 			common.Log.Debug("Domain not an array (got %T)", obj)
-			return nil, errors.New("Type check error")
+			return nil, ErrTypeError
 		}
 		shading.Domain = arr
 	}
@@ -321,7 +321,7 @@ func newPdfShadingType1FromDictionary(dict *PdfObjectDictionary) (*PdfShadingTyp
 		arr, ok := obj.(*PdfObjectArray)
 		if !ok {
 			common.Log.Debug("Matrix not an array (got %T)", obj)
-			return nil, errors.New("Type check error")
+			return nil, ErrTypeError
 		}
 		shading.Matrix = arr
 	}
@@ -367,11 +367,11 @@ func newPdfShadingType2FromDictionary(dict *PdfObjectDictionary) (*PdfShadingTyp
 	arr, ok := obj.(*PdfObjectArray)
 	if !ok {
 		common.Log.Debug("Coords not an array (got %T)", obj)
-		return nil, errors.New("Type check error")
+		return nil, ErrTypeError
 	}
 	if len(*arr) != 4 {
 		common.Log.Debug("Coords length not 4 (got %d)", len(*arr))
-		return nil, errors.New("Invalid attribute")
+		return nil, ErrInvalidAttribute
 	}
 	shading.Coords = arr
 
@@ -381,7 +381,7 @@ func newPdfShadingType2FromDictionary(dict *PdfObjectDictionary) (*PdfShadingTyp
 		arr, ok := obj.(*PdfObjectArray)
 		if !ok {
 			common.Log.Debug("Domain not an array (got %T)", obj)
-			return nil, errors.New("Type check error")
+			return nil, ErrTypeError
 		}
 		shading.Domain = arr
 	}
@@ -417,7 +417,7 @@ func newPdfShadingType2FromDictionary(dict *PdfObjectDictionary) (*PdfShadingTyp
 		arr, ok := obj.(*PdfObjectArray)
 		if !ok {
 			common.Log.Debug("Matrix not an array (got %T)", obj)
-			return nil, ErrTypeCheck
+			return nil, ErrTypeError
 		}
 		if len(*arr) != 2 {
 			common.Log.Debug("Extend length not 2 (got %d)", len(*arr))

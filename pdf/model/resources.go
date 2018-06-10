@@ -346,7 +346,7 @@ func (r *PdfPageResources) SetXObjectByName(keyName PdfObjectName, stream *PdfOb
 	xresDict, has := obj.(*PdfObjectDictionary)
 	if !has {
 		common.Log.Debug("Invalid XObject, got %T/%T", r.XObject, obj)
-		return errors.New("Type check error")
+		return ErrTypeError
 	}
 
 	xresDict.Set(keyName, stream)

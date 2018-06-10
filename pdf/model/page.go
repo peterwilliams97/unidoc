@@ -623,7 +623,7 @@ func (this *PdfPage) AddExtGState(name PdfObjectName, egs *PdfObjectDictionary) 
 	egsDict, ok := TraceToDirectObject(this.Resources.ExtGState).(*PdfObjectDictionary)
 	if !ok {
 		common.Log.Debug("Expected ExtGState dictionary is not a dictionary: %v", TraceToDirectObject(this.Resources.ExtGState))
-		return errors.New("Type check error")
+		return ErrTypeError
 	}
 
 	egsDict.Set(name, egs)
@@ -643,7 +643,7 @@ func (this *PdfPage) AddFont(name PdfObjectName, font PdfObject) error {
 	fontDict, ok := TraceToDirectObject(this.Resources.Font).(*PdfObjectDictionary)
 	if !ok {
 		common.Log.Debug("Expected font dictionary is not a dictionary: %v", TraceToDirectObject(this.Resources.Font))
-		return errors.New("Type check error")
+		return ErrTypeError
 	}
 
 	// Update the dictionary.
