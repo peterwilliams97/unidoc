@@ -13,7 +13,7 @@ import (
 
 	"github.com/unidoc/unidoc/common"
 	"github.com/unidoc/unidoc/pdf/contentstream" // Import all? !@#$
-	"github.com/unidoc/unidoc/pdf/core"
+	. "github.com/unidoc/unidoc/pdf/core"
 	"github.com/unidoc/unidoc/pdf/internal/cmap"
 	"github.com/unidoc/unidoc/pdf/model"
 	"github.com/unidoc/unidoc/pdf/model/fonts"
@@ -88,7 +88,7 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 				if ok, err := checkOp(op, to, 1, true); !ok {
 					return err
 				}
-				text, err := core.GetString(op.Params[0])
+				text, err := GetString(op.Params[0])
 				if err != nil {
 					return err
 				}
@@ -97,7 +97,7 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 				if ok, err := checkOp(op, to, 1, true); !ok {
 					return err
 				}
-				args, err := core.GetArray(op.Params[0])
+				args, err := GetArray(op.Params[0])
 				if err != nil {
 					return err
 				}
@@ -106,7 +106,7 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 				if ok, err := checkOp(op, to, 1, true); !ok {
 					return err
 				}
-				text, err := core.GetString(op.Params[0])
+				text, err := GetString(op.Params[0])
 				if err != nil {
 					return err
 				}
@@ -120,7 +120,7 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 				if err != nil {
 					return err
 				}
-				text, err := core.GetString(op.Params[2])
+				text, err := GetString(op.Params[2])
 				if err != nil {
 					return err
 				}
@@ -144,7 +144,7 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 				if ok, err := checkOp(op, to, 2, true); !ok {
 					return err
 				}
-				name, err := core.GetName(op.Params[0])
+				name, err := GetName(op.Params[0])
 				if err != nil {
 					return err
 				}
@@ -260,11 +260,11 @@ func (to *TextObject) showText(text string) error {
 }
 
 // showTextAdjusted "TJ" Show text with adjustable spacing
-func (to *TextObject) showTextAdjusted(args []core.PdfObject) error {
+func (to *TextObject) showTextAdjusted(args []PdfObject) error {
 	vertical := false
 	for _, o := range args {
 		switch o.(type) {
-		case *core.PdfObjectFloat, *core.PdfObjectInteger:
+		case *PdfObjectFloat, *PdfObjectInteger:
 			x, err := getNumberAsFloat(o)
 			if err != nil {
 				return err
@@ -274,8 +274,8 @@ func (to *TextObject) showTextAdjusted(args []core.PdfObject) error {
 				dy, dx = dx, dy
 			}
 			to.Tm.Translate(dx, dy)
-		case *core.PdfObjectString:
-			text, err := core.GetString(o)
+		case *PdfObjectString:
+			text, err := GetString(o)
 			if err != nil {
 				common.Log.Debug("showTextAdjusted args=%+v err=%v", args, err)
 				return err
@@ -563,19 +563,19 @@ func (to *TextObject) getCodemap(name string) (codemap *cmap.CMap, err error) {
 	if err != nil {
 		return
 	}
-	fontDict := fontObj.(*core.PdfObjectDictionary)
+	fontDict := fontObj.(*PdfObjectDictionary)
 	toUnicode := fontDict.Get("ToUnicode")
-	toUnicode = core.TraceToDirectObject(toUnicode)
+	toUnicode = TraceToDirectObject(toUnicode)
 	if toUnicode == nil {
 		return
 	}
-	toUnicodeStream, ok := toUnicode.(*core.PdfObjectStream)
+	toUnicodeStream, ok := toUnicode.(*PdfObjectStream)
 	if !ok {
 		err = errors.New("Invalid ToUnicode entry - not a stream")
 		return
 	}
 	var decoded []byte
-	decoded, err = core.DecodeStream(toUnicodeStream)
+	decoded, err = DecodeStream(toUnicodeStream)
 	if err != nil {
 		return
 	}
@@ -598,20 +598,20 @@ func (to *TextObject) getFont(name string) (*model.PdfFont, error) {
 
 // getFontDict returns the font object called `name` if it exists in the page's Font resources or
 // an error if it doesn't
-func (to *TextObject) getFontDict(name string) (fontObj core.PdfObject, err error) {
+func (to *TextObject) getFontDict(name string) (fontObj PdfObject, err error) {
 	resources := to.e.resources
 	if resources == nil {
 		common.Log.Debug("getFontDict: No resouces")
 		return
 	}
 
-	fontObj, found := resources.GetFontByName(core.PdfObjectName(name))
+	fontObj, found := resources.GetFontByName(PdfObjectName(name))
 	if !found {
 		err = errors.New("Font not in resources")
 		common.Log.Debug("getFontDict: Font not found: name=%q err=%v", name, err)
 		return
 	}
-	fontObj = core.TraceToDirectObject(fontObj)
+	fontObj = TraceToDirectObject(fontObj)
 	return
 }
 

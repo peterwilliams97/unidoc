@@ -13,7 +13,7 @@ import (
 	"github.com/common"
 	"github.com/unidoc/unidoc/common/license"
 	"github.com/unidoc/unidoc/pdf/contentstream"
-	"github.com/unidoc/unidoc/pdf/core"
+	. "github.com/unidoc/unidoc/pdf/core"
 	"github.com/unidoc/unidoc/pdf/model"
 )
 
@@ -29,7 +29,7 @@ const (
 	RenderModeClip
 )
 
-func toPageCoords(gs contentstream.GraphicsState, objs []core.PdfObject) (Point, error) {
+func toPageCoords(gs contentstream.GraphicsState, objs []PdfObject) (Point, error) {
 	x, y, err := toFloatXY(objs)
 	if err != nil {
 		return Point{}, err
@@ -37,7 +37,7 @@ func toPageCoords(gs contentstream.GraphicsState, objs []core.PdfObject) (Point,
 	return toPagePoint(gs, x, y), nil
 }
 
-func toPagePointList(gs contentstream.GraphicsState, objs []core.PdfObject) (points []Point, err error) {
+func toPagePointList(gs contentstream.GraphicsState, objs []PdfObject) (points []Point, err error) {
 	if len(objs)%2 != 0 {
 		err = fmt.Errorf("Invalid number of params: %d", len(objs))
 		common.Log.Debug("toPagePointList: err=%v", err)
@@ -61,7 +61,7 @@ func toPagePoint(gs contentstream.GraphicsState, x, y float64) Point {
 	return p
 }
 
-func toFloatXY(objs []core.PdfObject) (x, y float64, err error) {
+func toFloatXY(objs []PdfObject) (x, y float64, err error) {
 	if len(objs) != 2 {
 		err = fmt.Errorf("Invalid number of params: %d", len(objs))
 		common.Log.Debug("toFloatXY: err=%v", err)
@@ -75,7 +75,7 @@ func toFloatXY(objs []core.PdfObject) (x, y float64, err error) {
 	return
 }
 
-func toFloatList(objs []core.PdfObject) ([]float64, error) {
+func toFloatList(objs []PdfObject) ([]float64, error) {
 	return model.GetNumbersAsFloat(objs)
 	floats := []float64{}
 	for _, o := range objs {
@@ -89,13 +89,13 @@ func toFloatList(objs []core.PdfObject) ([]float64, error) {
 }
 
 // getNumberAsFloat can retrieve numeric values from PdfObject (both integer/float).
-func getNumberAsFloat(obj core.PdfObject) (float64, error) {
+func getNumberAsFloat(obj PdfObject) (float64, error) {
 	// return model.GetNumberAsFloat(obj)
-	if fObj, ok := obj.(*core.PdfObjectFloat); ok {
+	if fObj, ok := obj.(*PdfObjectFloat); ok {
 		return float64(*fObj), nil
 	}
 
-	if iObj, ok := obj.(*core.PdfObjectInteger); ok {
+	if iObj, ok := obj.(*PdfObjectInteger); ok {
 		return float64(*iObj), nil
 	}
 
