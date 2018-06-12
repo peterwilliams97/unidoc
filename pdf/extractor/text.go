@@ -420,10 +420,10 @@ func newTextObject(e *Extractor, gs contentstream.GraphicsState, state *TextStat
 // renderText emits `text` to the calling program
 // see 9.10.3, "ToUnicode CMaps"), whose value shall be a stream object containing a special
 func (to *TextObject) renderText(text string) {
-	text0 := text
+	// text0 := text
 	text = to.State.Tf.CharcodeBytesToUnicode([]byte(text))
 	cp := to.getCp()
-	fmt.Printf("renderText: %q->%q (%.1f,%.1f)\n", text0, text, cp.X, cp.Y)
+	// fmt.Printf("renderText: %#q⇒%#q (%.1f,%.1f)\n", text0, text, cp.X, cp.Y)
 	to.Texts = append(to.Texts, XYText{Point: cp, Text: text})
 
 	// s := to.State
@@ -434,7 +434,7 @@ func (to *TextObject) renderText(text string) {
 	// trm.Concat(to.Tm)
 	// trm.Concat(to.gs.CTM)
 
-	// encoder := to.State.Tf.GetEncoder()
+	// encoder := to.State.Tf.Encoder()
 	// for _, r := range text {
 	// 	wordSpacing := 0.0
 	// 	if r == ' ' {
@@ -598,10 +598,11 @@ func (to *TextObject) getFont(name string) (*model.PdfFont, error) {
 
 // getFontDict returns the font object called `name` if it exists in the page's Font resources or
 // an error if it doesn't
+// XXX: TODO: Can we cache font values
 func (to *TextObject) getFontDict(name string) (fontObj PdfObject, err error) {
 	resources := to.e.resources
 	if resources == nil {
-		common.Log.Debug("getFontDict: No resouces")
+		common.Log.Debug("getFontDict: No resources")
 		return
 	}
 
@@ -617,7 +618,7 @@ func (to *TextObject) getFontDict(name string) (fontObj PdfObject, err error) {
 
 // getCharMetrics returns the character metrics for the code points in `text1` for font `font`
 func getCharMetrics(font *model.PdfFont, text string) (metrics []fonts.CharMetrics, err error) {
-	encoder := font.GetEncoder()
+	encoder := font.Encoder()
 	if encoder == nil {
 		err = errors.New("No font encoder")
 	}

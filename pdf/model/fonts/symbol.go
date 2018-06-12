@@ -26,6 +26,10 @@ func NewFontSymbol() fontSymbol {
 	return font
 }
 
+func (font fontSymbol) Encoder() textencoding.TextEncoder {
+	return font.encoder
+}
+
 func (font fontSymbol) SetEncoder(encoder textencoding.TextEncoder) {
 	font.encoder = encoder
 }

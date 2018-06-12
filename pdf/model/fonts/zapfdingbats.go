@@ -26,6 +26,10 @@ func NewFontZapfDingbats() fontZapfDingbats {
 	return font
 }
 
+func (font fontZapfDingbats) Encoder() textencoding.TextEncoder {
+	return font.encoder
+}
+
 func (font fontZapfDingbats) SetEncoder(encoder textencoding.TextEncoder) {
 	font.encoder = encoder
 }

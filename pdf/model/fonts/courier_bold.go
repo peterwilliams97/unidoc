@@ -26,6 +26,10 @@ func NewFontCourierBold() fontCourierBold {
 	return font
 }
 
+func (font fontCourierBold) Encoder() textencoding.TextEncoder {
+	return font.encoder
+}
+
 func (font fontCourierBold) SetEncoder(encoder textencoding.TextEncoder) {
 	font.encoder = encoder
 }

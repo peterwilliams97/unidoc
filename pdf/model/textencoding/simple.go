@@ -91,7 +91,7 @@ func (se SimpleEncoder) RuneToCharcode(val rune) (byte, bool) {
 
 	code, found := se.glyphToCode[glyph]
 	if !found {
-		common.Log.Debug("Glyph -> Charcode error: glyph not found %s\n", glyph)
+		common.Log.Debug("Glyph -> Charcode error: glyph not found %s", glyph)
 		return 0, false
 	}
 
@@ -103,7 +103,7 @@ func (se SimpleEncoder) RuneToCharcode(val rune) (byte, bool) {
 func (se SimpleEncoder) CharcodeToRune(charcode byte) (rune, bool) {
 	glyph, found := se.codeToGlyph[charcode]
 	if !found {
-		common.Log.Debug("Charcode -> Glyph error: charcode not found: %d\n", charcode)
+		common.Log.Debug("Charcode -> Glyph error: charcode not found: %d", charcode)
 		return 0, false
 	}
 

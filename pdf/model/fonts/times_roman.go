@@ -26,6 +26,10 @@ func NewFontTimesRoman() fontTimesRoman {
 	return font
 }
 
+func (font fontTimesRoman) Encoder() textencoding.TextEncoder {
+	return font.encoder
+}
+
 func (font fontTimesRoman) SetEncoder(encoder textencoding.TextEncoder) {
 	font.encoder = encoder
 }

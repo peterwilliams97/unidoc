@@ -63,6 +63,8 @@ func TtfParse(fileStr string) (TtfRec TtfType, err error) {
 	if err != nil {
 		return
 	}
+	defer t.f.Close()
+
 	version, err := t.ReadStr(4)
 	if err != nil {
 		return
@@ -93,7 +95,6 @@ func TtfParse(fileStr string) (TtfRec TtfType, err error) {
 	if err != nil {
 		return
 	}
-	t.f.Close()
 	TtfRec = t.rec
 	return
 }
@@ -198,10 +199,6 @@ func (t *ttfParser) ParseCmap() (err error) {
 		err = fmt.Errorf("no Unicode encoding found")
 		return
 	}
-	startCount := make([]uint16, 0, 8)
-	endCount := make([]uint16, 0, 8)
-	idDelta := make([]int16, 0, 8)
-	idRangeOffset := make([]uint16, 0, 8)
 	t.rec.Chars = make(map[uint16]uint16)
 	t.f.Seek(int64(t.tables["cmap"])+offset31, os.SEEK_SET)
 	format := t.ReadUShort()
@@ -212,20 +209,12 @@ func (t *ttfParser) ParseCmap() (err error) {
 	t.Skip(2 * 2) // length, language
 	segCount := int(t.ReadUShort() / 2)
 	t.Skip(3 * 2) // searchRange, entrySelector, rangeShift
-	for j := 0; j < segCount; j++ {
-		endCount = append(endCount, t.ReadUShort())
-	}
+	endCount := t.ReadUShortSlice(segCount)
 	t.Skip(2) // reservedPad
-	for j := 0; j < segCount; j++ {
-		startCount = append(startCount, t.ReadUShort())
-	}
-	for j := 0; j < segCount; j++ {
-		idDelta = append(idDelta, t.ReadShort())
-	}
+	startCount := t.ReadUShortSlice(segCount)
+	idDelta := t.ReadShortSlice(segCount)
 	offset, _ = t.f.Seek(int64(0), os.SEEK_CUR)
-	for j := 0; j < segCount; j++ {
-		idRangeOffset = append(idRangeOffset, t.ReadUShort())
-	}
+	idRangeOffset := t.ReadUShortSlice(segCount)
 	for j := 0; j < segCount; j++ {
 		c1 := startCount[j]
 		c2 := endCount[j]
@@ -354,6 +343,20 @@ func (t *ttfParser) ReadStr(length int) (str string, err error) {
 		} else {
 			err = fmt.Errorf("unable to read %d bytes", length)
 		}
+	}
+	return
+}
+
+func (t *ttfParser) ReadUShortSlice(n int) (val []uint16) {
+	for i := 0; i < n; i++ {
+		val = append(val, t.ReadUShort())
+	}
+	return
+}
+
+func (t *ttfParser) ReadShortSlice(n int) (val []int16) {
+	for i := 0; i < n; i++ {
+		val = append(val, t.ReadShort())
 	}
 	return
 }

@@ -26,6 +26,10 @@ func NewFontCourierBoldOblique() fontCourierBoldOblique {
 	return font
 }
 
+func (font fontCourierBoldOblique) Encoder() textencoding.TextEncoder {
+	return font.encoder
+}
+
 func (font fontCourierBoldOblique) SetEncoder(encoder textencoding.TextEncoder) {
 	font.encoder = encoder
 }

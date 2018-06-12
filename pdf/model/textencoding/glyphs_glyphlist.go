@@ -3,8 +3,8 @@
  * file 'LICENSE.md', which is part of this source code package.
  */
 /*
- * The embedded glyph to unicode mappings specified in this file are distributed under the terms listed in
- * ./glyphlist/glyphlist.txt.
+ * The embedded glyph to unicode mappings specified in this file are distributed under the terms
+ * listed in ./glyphlist/glyphlist.txt.
  */
 
 package textencoding
@@ -4292,6 +4292,7 @@ var glyphlistGlyphToRuneMap = map[string]rune{ // 4281 entries
 	"zuhiragana":                '\u305a', // ず
 	"zukatakana":                '\u30ba', // ズ
 }
+
 var glyphlistRuneToGlyphMap = map[rune]string{ // 3680 entries
 	'\u0041': "A",        // A
 	'\u00c6': "AE",       // Æ

@@ -26,6 +26,10 @@ func NewFontTimesItalic() fontTimesItalic {
 	return font
 }
 
+func (font fontTimesItalic) Encoder() textencoding.TextEncoder {
+	return font.encoder
+}
+
 func (font fontTimesItalic) SetEncoder(encoder textencoding.TextEncoder) {
 	font.encoder = encoder
 }

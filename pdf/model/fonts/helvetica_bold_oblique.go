@@ -26,6 +26,10 @@ func NewFontHelveticaBoldOblique() fontHelveticaBoldOblique {
 	return font
 }
 
+func (font fontHelveticaBoldOblique) Encoder() textencoding.TextEncoder {
+	return font.encoder
+}
+
 func (font fontHelveticaBoldOblique) SetEncoder(encoder textencoding.TextEncoder) {
 	font.encoder = encoder
 }
