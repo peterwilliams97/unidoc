@@ -42,7 +42,6 @@ var (
 	SimpleFontTypes = map[string]bool{
 		"Type1":    true,
 		"Type3":    true,
-		"Type0":    true,
 		"MMType1":  true,
 		"TrueType": true,
 	}

@@ -21,8 +21,8 @@ var (
 type SimpleEncoder struct {
 	baseName    string
 	differences map[byte]string
-	codeToGlyph map[byte]string
-	glyphToCode map[string]byte
+	codeToGlyph map[uint16]string
+	glyphToCode map[string]uint16
 }
 
 func NewSimpleTextEncoder(baseName string, differences map[byte]string) (SimpleEncoder, error) {
@@ -31,14 +31,14 @@ func NewSimpleTextEncoder(baseName string, differences map[byte]string) (SimpleE
 		common.Log.Debug("Error: NewSimpleTextEncoder. Unknown encoding %q", baseName)
 		return SimpleEncoder{}, errors.New("Unsupported font encoding")
 	}
-	codeToRune := map[byte]rune{}
+	codeToRune := map[uint16]rune{}
 	for code, r := range baseEncoding {
 		codeToRune[code] = r
 	}
 	if differences != nil {
 		for code, glyph := range differences {
 			if r, ok := glyphlistGlyphToRuneMap[glyph]; ok {
-				codeToRune[code] = r
+				codeToRune[uint16(code)] = r
 			}
 		}
 	}
@@ -52,15 +52,15 @@ func (se SimpleEncoder) Encode(raw string) string {
 	for _, rune := range raw {
 		code, has := se.RuneToCharcode(rune)
 		if has {
-			encoded = append(encoded, code)
+			encoded = append(encoded, byte(code))
 		}
 	}
 	return string(encoded)
 }
 
-// Conversion between character code and glyph name.
+// CharcodeToGlyph returns the glyph name for character code `code`.
 // The bool return flag is true if there was a match, and false otherwise.
-func (se SimpleEncoder) CharcodeToGlyph(code byte) (string, bool) {
+func (se SimpleEncoder) CharcodeToGlyph(code uint16) (string, bool) {
 	glyph, has := se.codeToGlyph[code]
 	if !has {
 		common.Log.Debug("Charcode -> Glyph error: charcode not found: %d\n", code)
@@ -69,9 +69,9 @@ func (se SimpleEncoder) CharcodeToGlyph(code byte) (string, bool) {
 	return glyph, true
 }
 
-// Conversion between glyph name and character code.
+// GlyphToCharcode returns character code for glyph `glyph`.
 // The bool return flag is true if there was a match, and false otherwise.
-func (se SimpleEncoder) GlyphToCharcode(glyph string) (byte, bool) {
+func (se SimpleEncoder) GlyphToCharcode(glyph string) (uint16, bool) {
 	code, found := se.glyphToCode[glyph]
 	if !found {
 		common.Log.Debug("Glyph -> Charcode error: glyph not found: %s\n", glyph)
@@ -83,7 +83,7 @@ func (se SimpleEncoder) GlyphToCharcode(glyph string) (byte, bool) {
 
 // Convert rune to character code.
 // The bool return flag is true if there was a match, and false otherwise.
-func (se SimpleEncoder) RuneToCharcode(val rune) (byte, bool) {
+func (se SimpleEncoder) RuneToCharcode(val rune) (uint16, bool) {
 	glyph, found := se.RuneToGlyph(val)
 	if !found {
 		return 0, false
@@ -100,7 +100,7 @@ func (se SimpleEncoder) RuneToCharcode(val rune) (byte, bool) {
 
 // Convert character code to rune.
 // The bool return flag is true if there was a match, and false otherwise.
-func (se SimpleEncoder) CharcodeToRune(charcode byte) (rune, bool) {
+func (se SimpleEncoder) CharcodeToRune(charcode uint16) (rune, bool) {
 	glyph, found := se.codeToGlyph[charcode]
 	if !found {
 		common.Log.Debug("Charcode -> Glyph error: charcode not found: %d", charcode)
@@ -141,9 +141,9 @@ func (se SimpleEncoder) ToPdfObject() core.PdfObject {
 	return core.MakeIndirectObject(dict)
 }
 
-func makeEncoder(baseName string, codes map[byte]rune) SimpleEncoder {
-	codeToGlyph := map[byte]string{}
-	glyphToCode := map[string]byte{}
+func makeEncoder(baseName string, codes map[uint16]rune) SimpleEncoder {
+	codeToGlyph := map[uint16]string{}
+	glyphToCode := map[string]uint16{}
 	for b, code := range codes {
 		g := glyphlistRuneToGlyphMap[code]
 		codeToGlyph[b] = g
@@ -201,8 +201,9 @@ func ToFontDifferences(differences map[byte]string) []core.PdfObject {
 	return diffList
 }
 
-var simpleEncodings = map[string]map[byte]rune{
-	"MacExpertEncoding": map[byte]rune{
+// !@#$ byte --> uint16
+var simpleEncodings = map[string]map[uint16]rune{
+	"MacExpertEncoding": map[uint16]rune{
 		0x20: '\u0020', //     "space"
 		0x21: '\uf721', //     "exclamsmall"
 		0x22: '\uf6f8', //     "Hungarumlautsmall"
@@ -369,7 +370,7 @@ var simpleEncodings = map[string]map[byte]rune{
 		0xfa: '\uf6f7', //     "Dotaccentsmall"
 		0xfb: '\uf6fc', //     "Ringsmall"
 	},
-	"MacRomanEncoding": map[byte]rune{
+	"MacRomanEncoding": map[uint16]rune{
 		0x01: '\u0001', //     "controlSTX"
 		0x02: '\u0002', //     "controlSOT"
 		0x03: '\u0003', //     "controlETX"
@@ -626,7 +627,7 @@ var simpleEncodings = map[string]map[byte]rune{
 		0xfe: '\u02db', //  ˛  "ogonek"
 		0xff: '\u02c7', //  ˇ  "caron"
 	},
-	"PdfDocEncoding": map[byte]rune{
+	"PdfDocEncoding": map[uint16]rune{
 		0x01: '\u0001', //     "controlSTX"
 		0x02: '\u0002', //     "controlSOT"
 		0x03: '\u0003', //     "controlETX"
@@ -880,7 +881,7 @@ var simpleEncodings = map[string]map[byte]rune{
 		0xfe: '\u00fe', //  þ  "thorn"
 		0xff: '\u00ff', //  ÿ  "ydieresis"
 	},
-	"StandardEncoding": map[byte]rune{
+	"StandardEncoding": map[uint16]rune{
 		0x20: '\u0020', //     "space"
 		0x21: '\u0021', //  !  "exclam"
 		0x22: '\u0022', //  "  "quotedbl"
@@ -1031,7 +1032,7 @@ var simpleEncodings = map[string]map[byte]rune{
 		0xf9: '\u0153', //  œ  "oe"
 		0xfa: '\u00df', //  ß  "germandbls"
 	},
-	"SymbolEncoding": map[byte]rune{
+	"SymbolEncoding": map[uint16]rune{
 		0x20: '\u0020', //     "space"
 		0x21: '\u0021', //  !  "exclam"
 		0x22: '\u2200', //  ∀  "forall"
@@ -1222,7 +1223,7 @@ var simpleEncodings = map[string]map[byte]rune{
 		0xfd: '\uf8fd', //     "bracerightmid"
 		0xfe: '\uf8fe', //     "bracerightbt"
 	},
-	"WinAnsiEncoding": map[byte]rune{
+	"WinAnsiEncoding": map[uint16]rune{
 		0x01: '\u0001', //     "controlSTX"
 		0x02: '\u0002', //     "controlSOT"
 		0x03: '\u0003', //     "controlETX"
@@ -1474,7 +1475,7 @@ var simpleEncodings = map[string]map[byte]rune{
 		0xfe: '\u00fe', //  þ  "thorn"
 		0xff: '\u00ff', //  ÿ  "ydieresis"
 	},
-	"ZapfDingbatsEncoding": map[byte]rune{
+	"ZapfDingbatsEncoding": map[uint16]rune{
 		0x20: '\u0020', //     "space"
 		0x21: '\u2701', //  ✁  ""
 		0x22: '\u2702', //  ✂  ""
