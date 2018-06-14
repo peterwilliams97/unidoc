@@ -54,24 +54,21 @@ func (se SimpleEncoder) Encode(raw string) string {
 // CharcodeToGlyph returns the glyph name for character code `code`.
 // The bool return flag is true if there was a match, and false otherwise.
 func (se SimpleEncoder) CharcodeToGlyph(code uint16) (string, bool) {
-	glyph, has := se.codeToGlyph[code]
-	if !has {
-		common.Log.Debug("Charcode -> Glyph error: charcode not found: %d\n", code)
-		return "", false
+	glyph, ok := se.codeToGlyph[code]
+	if !ok {
+		common.Log.Debug("Charcode -> Glyph error: charcode not found: 0x%04x", code)
 	}
-	return glyph, true
+	return glyph, ok
 }
 
 // GlyphToCharcode returns character code for glyph `glyph`.
 // The bool return flag is true if there was a match, and false otherwise.
 func (se SimpleEncoder) GlyphToCharcode(glyph string) (uint16, bool) {
-	code, found := se.glyphToCode[glyph]
-	if !found {
-		common.Log.Debug("Glyph -> Charcode error: glyph not found: %s\n", glyph)
-		return 0, false
+	code, ok := se.glyphToCode[glyph]
+	if !ok {
+		common.Log.Debug("Glyph -> Charcode error: glyph not found: %q", glyph)
 	}
-
-	return code, true
+	return code, ok
 }
 
 // Convert rune to character code.
@@ -172,7 +169,6 @@ func ToFontDifferences(differences map[byte]string) []PdfObject {
 	return diffList
 }
 
-// !@#$ byte --> uint16
 var simpleEncodings = map[string]map[uint16]rune{
 	"MacExpertEncoding": map[uint16]rune{
 		0x20: '\u0020', //     "space"
