@@ -14,31 +14,31 @@ import (
 	"github.com/unidoc/unidoc/pdf/model/textencoding"
 )
 
-// fontHelvetica represents the Helvetica font.
+// FontHelvetica represents the Helvetica font.
 // This is a built-in font and it is assumed that every reader has access to it.
-type fontHelvetica struct {
+type FontHelvetica struct {
 	encoder textencoding.TextEncoder
 }
 
 // NewFontHelvetica returns a new instance of the font with a default encoder set (WinAnsiEncoding).
-func NewFontHelvetica() fontHelvetica {
-	font := fontHelvetica{}
+func NewFontHelvetica() FontHelvetica {
+	font := FontHelvetica{}
 	font.encoder = textencoding.NewWinAnsiTextEncoder() // Default
 	return font
 }
 
 // Encoder returns the font's text encoder.
-func (font fontHelvetica) Encoder() textencoding.TextEncoder {
+func (font FontHelvetica) Encoder() textencoding.TextEncoder {
 	return font.encoder
 }
 
 // SetEncoder sets the font's text encoder.
-func (font fontHelvetica) SetEncoder(encoder textencoding.TextEncoder) {
+func (font FontHelvetica) SetEncoder(encoder textencoding.TextEncoder) {
 	font.encoder = encoder
 }
 
 // GetGlyphCharMetrics returns character metrics for a given glyph.
-func (font fontHelvetica) GetGlyphCharMetrics(glyph string) (CharMetrics, bool) {
+func (font FontHelvetica) GetGlyphCharMetrics(glyph string) (CharMetrics, bool) {
 	metrics, has := helveticaCharMetrics[glyph]
 	if !has {
 		return metrics, false
@@ -48,7 +48,7 @@ func (font fontHelvetica) GetGlyphCharMetrics(glyph string) (CharMetrics, bool) 
 }
 
 // ToPdfObject returns a primitive PDF object representation of the font.
-func (font fontHelvetica) ToPdfObject() core.PdfObject {
+func (font FontHelvetica) ToPdfObject() core.PdfObject {
 	obj := &core.PdfIndirectObject{}
 
 	fontDict := core.MakeDict()

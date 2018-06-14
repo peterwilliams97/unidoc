@@ -470,13 +470,14 @@ func (csp *ContentStreamProcessor) handleCommand_G(op *ContentStreamOperation, r
 func (csp *ContentStreamProcessor) handleCommand_g(op *ContentStreamOperation, resources *PdfPageResources) error {
 	cs := NewPdfColorspaceDeviceGray()
 	if len(op.Params) != cs.GetNumComponents() {
-		common.Log.Debug("Invalid number of parameters for SC")
+		common.Log.Debug("Invalid number of parameters for g")
 		common.Log.Debug("Number %d not matching colorspace %T", len(op.Params), cs)
 		return errors.New("Invalid number of parameters")
 	}
 
 	color, err := cs.ColorFromPdfObjects(op.Params)
 	if err != nil {
+		common.Log.Debug("ERROR: handleCommand_g Invalid params. cs=%T op=%s err=%v", cs, op, err)
 		return err
 	}
 
@@ -491,7 +492,7 @@ func (csp *ContentStreamProcessor) handleCommand_g(op *ContentStreamOperation, r
 func (csp *ContentStreamProcessor) handleCommand_RG(op *ContentStreamOperation, resources *PdfPageResources) error {
 	cs := NewPdfColorspaceDeviceRGB()
 	if len(op.Params) != cs.GetNumComponents() {
-		common.Log.Debug("Invalid number of parameters for SC")
+		common.Log.Debug("Invalid number of parameters for RG")
 		common.Log.Debug("Number %d not matching colorspace %T", len(op.Params), cs)
 		return errors.New("Invalid number of parameters")
 	}

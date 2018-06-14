@@ -98,30 +98,17 @@ func (font pdfFontSimple) GetGlyphCharMetrics(glyph string) (fonts.CharMetrics, 
 // newSimpleFontFromPdfObject creates a pdfFontSimple from a dictionary. An error is returned
 // if there is a problem with loading.
 // !@#$ Just return a base 14 font, if obj is a base 14 font
-func newSimpleFontFromPdfObject(obj PdfObject) (*pdfFontSimple, error) {
+//
+// The value of Encoding is subject to limitations that are described in 9.6.6, "Character Encoding".
+// • The value of BaseFont is derived differently.
+//
+// !@#$ 9.6.6.4 Encodings for TrueType Fonts (page 265)
+//      Need to get TrueType font's cmap
+func newSimpleFontFromPdfObject(obj PdfObject, subtype string, d *PdfObjectDictionary) (*pdfFontSimple, error) {
 	font := &pdfFontSimple{}
 
-	if ind, is := obj.(*PdfIndirectObject); is {
-		font.container = ind
-		obj = ind.PdfObject
-	}
-
-	d, ok := obj.(*PdfObjectDictionary)
-	if !ok {
-		common.Log.Debug("Font object invalid, not a dictionary (%T)", obj)
-		return nil, ErrTypeError
-	}
-
-	if typ, err := GetName(d.Get("Type")); err != nil || typ != "Font" {
-		common.Log.Debug("Incompatibility: Type defined but not Font. Type=%q err=%v", typ, err)
-	}
-
-	subtype, err := GetName(d.Get("Subtype"))
-	if err != nil {
-		common.Log.Debug("Incompatibility: Font Subtype not defined")
-	}
 	if _, ok := fonts.SimpleFontTypes[subtype]; !ok {
-		common.Log.Debug("Incompatibility: Loading simple font of unknown  subtype=%q. Assuming Type1",
+		common.Log.Debug("Incompatibility: Loading simple font of unknown: subtype=%q. Assuming Type1",
 			subtype)
 		subtype = "Type1"
 	}
@@ -134,6 +121,7 @@ func newSimpleFontFromPdfObject(obj PdfObject) (*pdfFontSimple, error) {
 		font.baseFont = basefont
 	}
 
+	// !@#$ Do this in the calling function
 	if fm, ok := fonts.Standard14FontMetrics[basefont]; ok && subtype == "Type1" {
 		font.firstChar = fm.FirstChar
 		font.lastChar = fm.LastChar
@@ -146,6 +134,7 @@ func newSimpleFontFromPdfObject(obj PdfObject) (*pdfFontSimple, error) {
 		}
 		font.Widths = PdfObject(MakeArray(objects...))
 	} else {
+		// !@#$ Failing on ~/testdata/The-Byzantine-Generals-Problem.pdf
 		obj = d.Get("FirstChar")
 		if obj == nil {
 			if subtype == "TrueType" {
@@ -225,8 +214,8 @@ func newSimpleFontFromPdfObject(obj PdfObject) (*pdfFontSimple, error) {
 
 		baseEncoder, differences, err := getFontEncoding(TraceToDirectObject(font.Encoding))
 		if err != nil {
-			common.Log.Debug("Error: Encoding=%s (%T) err=%v", font.Encoding.String(),
-				font.Encoding, err)
+			common.Log.Debug("Error: BaseFont=%q Subtype=%q Encoding=%s (%T) err=%v", basefont,
+				subtype, font.Encoding, font.Encoding, err)
 			return nil, err
 		}
 		encoder, err := textencoding.NewSimpleTextEncoder(baseEncoder, differences)
@@ -244,6 +233,60 @@ func newSimpleFontFromPdfObject(obj PdfObject) (*pdfFontSimple, error) {
 		font.CMap = codemap
 	}
 	return font, nil
+}
+
+// getFontEncoding returns font encoding of `obj` the "Encoding" entry in a font dict
+// Table 114 – Entries in an encoding dictionary (page 263)
+// 9.6.6.1 General (page 262)
+// A font’s encoding is the association between character codes (obtained from text strings that
+// are shown) and glyph descriptions. This sub-clause describes the character encoding scheme used
+// with simple PDF fonts. Composite fonts (Type 0) use a different character mapping algorithm, as
+// discussed in 9.7, "Composite Fonts".
+// Except for Type 3 fonts, every font program shall have a built-in encoding. Under certain
+// circumstances, a PDF font dictionary may change the encoding used with the font program to match
+// the requirements of the conforming writer generating the text being shown.
+func getFontEncoding(obj PdfObject) (string, map[byte]string, error) {
+	baseName := "StandardEncoding"
+
+	if obj == nil {
+		// common.Log.Debug("Incompatibility ERROR: Font Encoding (Required) missing")
+		return baseName, nil, nil
+		return "", nil, ErrRequiredAttributeMissing
+	}
+
+	switch encoding := obj.(type) {
+	case *PdfObjectName:
+		return string(*encoding), nil, nil
+	case *PdfObjectDictionary:
+		typ, err := GetName(TraceToDirectObject(encoding.Get("Type")))
+		if err == nil && typ == "Encoding" {
+			// common.Log.Debug("Incompatibility ERROR: Bad font encoding dict. Type=%q!=%q err=%v",
+			// 	typ, "Encoding", err)
+			// return "", nil, ErrTypeError
+
+			base, err := GetName(TraceToDirectObject(encoding.Get("BaseEncoding")))
+			if err == nil {
+				baseName = base
+			}
+			//  common.Log.Debug("Incompatibility ERROR: Bad font encoding dict. BaseEncoding=%q (%T) err=%v",
+			// 	baseName, encoding.Get("BaseEncoding"), err)
+			// baseName = "StandardEncoding"
+			// return "", nil, ErrTypeError
+			// }
+		}
+		diffList, err := GetArray(TraceToDirectObject(encoding.Get("Differences")))
+		if err != nil {
+			common.Log.Debug("Incompatibility ERROR: Bad font encoding dict. %+v err=%v", encoding, err)
+			return "", nil, ErrTypeError
+		}
+
+		differences, err := textencoding.FromFontDifferences(diffList)
+		return baseName, differences, err
+	default:
+		common.Log.Debug("Incompatibility ERROR: encoding not a name or dict (%T) %s",
+			obj, obj.String())
+		return "", nil, ErrTypeError
+	}
 }
 
 // ToPdfObject converts the pdfFontTrueType to its PDF representation for outputting.

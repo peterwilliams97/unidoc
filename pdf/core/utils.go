@@ -187,7 +187,6 @@ func GetString(obj PdfObject) (string, error) {
 		return string(*s), nil
 	}
 	err := errors.New("Not a string")
-	common.Log.Debug("GetString: obj=%T %s err=%v", obj, obj.String(), err)
 	return "", err
 }
 
@@ -196,7 +195,6 @@ func GetName(obj PdfObject) (string, error) {
 		return string(*s), nil
 	}
 	err := errors.New("Not a name")
-	common.Log.Debug("GetName: obj=%T %s err=%v", obj, obj.String(), err)
 	return "", err
 }
 
@@ -205,6 +203,5 @@ func GetArray(obj PdfObject) ([]PdfObject, error) {
 		return []PdfObject(*s), nil
 	}
 	err := errors.New("Not an array")
-	common.Log.Debug("getArray: obj=%T %s err=%v", obj, obj.String(), err)
 	return nil, err
 }

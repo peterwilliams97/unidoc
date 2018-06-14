@@ -8,13 +8,12 @@
 package core
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
-
-	"bufio"
-	"io"
 	"strconv"
 
 	"github.com/unidoc/unidoc/common"
@@ -282,5 +281,5 @@ func (parser *PdfParser) seekPdfVersionTopDown() (int, int, error) {
 		last = append(last[1:bufLen], b)
 	}
 
-	return 0, 0, errors.New("Version not found")
+	return 0, 0, ErrNoPdfVersion
 }

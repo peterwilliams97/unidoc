@@ -129,7 +129,7 @@ func (this *PdfReader) CheckAccessRights(password []byte) (bool, AccessPermissio
 // Loads the structure of the pdf file: pages, outlines, etc.
 func (this *PdfReader) loadStructure() error {
 	if this.parser.GetCrypter() != nil && !this.parser.IsAuthenticated() {
-		return fmt.Errorf("File need to be decrypted first")
+		return ErrEncrypted
 	}
 
 	trailerDict := this.parser.GetTrailer()
@@ -253,7 +253,7 @@ func (this *PdfReader) traceToObject(obj PdfObject) (PdfObject, error) {
 
 func (this *PdfReader) loadOutlines() (*PdfOutlineTreeNode, error) {
 	if this.parser.GetCrypter() != nil && !this.parser.IsAuthenticated() {
-		return nil, fmt.Errorf("File need to be decrypted first")
+		return nil, ErrEncrypted
 	}
 
 	// Has outlines? Otherwise return an empty outlines structure.
@@ -444,7 +444,7 @@ func (this *PdfReader) GetOutlinesFlattened() ([]*PdfOutlineTreeNode, []string, 
 
 func (this *PdfReader) loadForms() (*PdfAcroForm, error) {
 	if this.parser.GetCrypter() != nil && !this.parser.IsAuthenticated() {
-		return nil, fmt.Errorf("File need to be decrypted first")
+		return nil, ErrEncrypted
 	}
 
 	// Has forms?
@@ -591,7 +591,7 @@ func (this *PdfReader) buildPageList(node *PdfIndirectObject, parent *PdfIndirec
 // Get the number of pages in the document.
 func (this *PdfReader) GetNumPages() (int, error) {
 	if this.parser.GetCrypter() != nil && !this.parser.IsAuthenticated() {
-		return 0, fmt.Errorf("File need to be decrypted first")
+		return 0, ErrEncrypted
 	}
 	return len(this.pageList), nil
 }
@@ -697,7 +697,7 @@ func (this *PdfReader) traverseObjectData(o PdfObject) error {
 // Get a page by the page number. Indirect object with type /Page.
 func (this *PdfReader) GetPageAsIndirectObject(pageNumber int) (PdfObject, error) {
 	if this.parser.GetCrypter() != nil && !this.parser.IsAuthenticated() {
-		return nil, fmt.Errorf("File needs to be decrypted first")
+		return nil, ErrEncrypted
 	}
 	if len(this.pageList) < pageNumber {
 		return nil, errors.New("Invalid page number (page count too short)")
@@ -719,7 +719,7 @@ func (this *PdfReader) GetPageAsIndirectObject(pageNumber int) (PdfObject, error
 // Returns the PdfPage entry.
 func (this *PdfReader) GetPage(pageNumber int) (*PdfPage, error) {
 	if this.parser.GetCrypter() != nil && !this.parser.IsAuthenticated() {
-		return nil, fmt.Errorf("File needs to be decrypted first")
+		return nil, ErrEncrypted
 	}
 	if len(this.pageList) < pageNumber {
 		return nil, errors.New("Invalid page number (page count too short)")

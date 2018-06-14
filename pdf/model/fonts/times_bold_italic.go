@@ -14,31 +14,31 @@ import (
 	"github.com/unidoc/unidoc/pdf/model/textencoding"
 )
 
-// fontTimesBoldItalic represents the Times-BoldItalic font.
+// FontTimesBoldItalic represents the Times-BoldItalic font.
 // This is a built-in font and it is assumed that every reader has access to it.
-type fontTimesBoldItalic struct {
+type FontTimesBoldItalic struct {
 	encoder textencoding.TextEncoder
 }
 
 // NewFontTimesBoldItalic returns a new instance of the font with a default encoder set (WinAnsiEncoding).
-func NewFontTimesBoldItalic() fontTimesBoldItalic {
-	font := fontTimesBoldItalic{}
+func NewFontTimesBoldItalic() FontTimesBoldItalic {
+	font := FontTimesBoldItalic{}
 	font.encoder = textencoding.NewWinAnsiTextEncoder() // Default
 	return font
 }
 
 // Encoder returns the font's text encoder.
-func (font fontTimesBoldItalic) Encoder() textencoding.TextEncoder {
+func (font FontTimesBoldItalic) Encoder() textencoding.TextEncoder {
 	return font.encoder
 }
 
 // SetEncoder sets the font's text encoder.
-func (font fontTimesBoldItalic) SetEncoder(encoder textencoding.TextEncoder) {
+func (font FontTimesBoldItalic) SetEncoder(encoder textencoding.TextEncoder) {
 	font.encoder = encoder
 }
 
 // GetGlyphCharMetrics returns character metrics for a given glyph.
-func (font fontTimesBoldItalic) GetGlyphCharMetrics(glyph string) (CharMetrics, bool) {
+func (font FontTimesBoldItalic) GetGlyphCharMetrics(glyph string) (CharMetrics, bool) {
 	metrics, has := timesBoldItalicCharMetrics[glyph]
 	if !has {
 		return metrics, false
@@ -48,7 +48,7 @@ func (font fontTimesBoldItalic) GetGlyphCharMetrics(glyph string) (CharMetrics, 
 }
 
 // ToPdfObject returns a primitive PDF object representation of the font.
-func (font fontTimesBoldItalic) ToPdfObject() core.PdfObject {
+func (font FontTimesBoldItalic) ToPdfObject() core.PdfObject {
 	obj := &core.PdfIndirectObject{}
 
 	fontDict := core.MakeDict()

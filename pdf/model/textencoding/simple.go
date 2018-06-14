@@ -10,7 +10,7 @@ import (
 	"sort"
 
 	"github.com/unidoc/unidoc/common"
-	"github.com/unidoc/unidoc/pdf/core"
+	. "github.com/unidoc/unidoc/pdf/core"
 )
 
 var (
@@ -48,14 +48,7 @@ func NewSimpleTextEncoder(baseName string, differences map[byte]string) (SimpleE
 // Convert a raw unicode string (series of runes) to an encoded string (series of character codes) to
 // be used in PDF.
 func (se SimpleEncoder) Encode(raw string) string {
-	encoded := []byte{}
-	for _, rune := range raw {
-		code, has := se.RuneToCharcode(rune)
-		if has {
-			encoded = append(encoded, byte(code))
-		}
-	}
-	return string(encoded)
+	return doEncode(se, raw)
 }
 
 // CharcodeToGlyph returns the glyph name for character code `code`.
@@ -84,35 +77,13 @@ func (se SimpleEncoder) GlyphToCharcode(glyph string) (uint16, bool) {
 // Convert rune to character code.
 // The bool return flag is true if there was a match, and false otherwise.
 func (se SimpleEncoder) RuneToCharcode(val rune) (uint16, bool) {
-	glyph, found := se.RuneToGlyph(val)
-	if !found {
-		return 0, false
-	}
-
-	code, found := se.glyphToCode[glyph]
-	if !found {
-		common.Log.Debug("Glyph -> Charcode error: glyph not found %s", glyph)
-		return 0, false
-	}
-
-	return code, true
+	return doRuneToCharcode(se, val)
 }
 
 // Convert character code to rune.
 // The bool return flag is true if there was a match, and false otherwise.
-func (se SimpleEncoder) CharcodeToRune(charcode uint16) (rune, bool) {
-	glyph, found := se.codeToGlyph[charcode]
-	if !found {
-		common.Log.Debug("Charcode -> Glyph error: charcode not found: %d", charcode)
-		return 0, false
-	}
-
-	ucode, found := glyphToRune(glyph, glyphlistGlyphToRuneMap)
-	if !found {
-		return 0, false
-	}
-
-	return ucode, true
+func (se SimpleEncoder) CharcodeToRune(code uint16) (rune, bool) {
+	return doCharcodeToRune(se, code)
 }
 
 // Convert rune to glyph name.
@@ -128,26 +99,26 @@ func (se SimpleEncoder) GlyphToRune(glyph string) (rune, bool) {
 }
 
 // ToPdfObject returns `se` as a PdfObject
-func (se SimpleEncoder) ToPdfObject() core.PdfObject {
+func (se SimpleEncoder) ToPdfObject() PdfObject {
 	if se.differences == nil {
-		return core.MakeName(se.baseName)
+		return MakeName(se.baseName)
 	}
-	dict := core.MakeDict()
-	dict.Set("Type", core.MakeName("Encoding"))
-	dict.Set("BaseEncoding", core.MakeName(se.baseName))
-	dict.Set("Differences", core.MakeArray(ToFontDifferences(se.differences)...))
+	dict := MakeDict()
+	dict.Set("Type", MakeName("Encoding"))
+	dict.Set("BaseEncoding", MakeName(se.baseName))
+	dict.Set("Differences", MakeArray(ToFontDifferences(se.differences)...))
 
 	// Return an empty Encoding object
-	return core.MakeIndirectObject(dict)
+	return MakeIndirectObject(dict)
 }
 
-func makeEncoder(baseName string, codes map[uint16]rune) SimpleEncoder {
+func makeEncoder(baseName string, codeToRune map[uint16]rune) SimpleEncoder {
 	codeToGlyph := map[uint16]string{}
 	glyphToCode := map[string]uint16{}
-	for b, code := range codes {
-		g := glyphlistRuneToGlyphMap[code]
-		codeToGlyph[b] = g
-		glyphToCode[g] = b
+	for code, r := range codeToRune {
+		glyph := glyphlistRuneToGlyphMap[r]
+		codeToGlyph[code] = glyph
+		glyphToCode[glyph] = code
 	}
 	return SimpleEncoder{
 		baseName:    baseName,
@@ -156,14 +127,14 @@ func makeEncoder(baseName string, codes map[uint16]rune) SimpleEncoder {
 	}
 }
 
-func FromFontDifferences(diffList []core.PdfObject) (map[byte]string, error) {
+func FromFontDifferences(diffList []PdfObject) (map[byte]string, error) {
 	differences := map[byte]string{}
 	var n byte
 	for _, obj := range diffList {
 		switch v := obj.(type) {
-		case *core.PdfObjectInteger:
+		case *PdfObjectInteger:
 			n = byte(*v)
-		case *core.PdfObjectName:
+		case *PdfObjectName:
 			s := string(*v)
 			differences[n] = s
 			n++
@@ -175,9 +146,9 @@ func FromFontDifferences(diffList []core.PdfObject) (map[byte]string, error) {
 	return differences, nil
 }
 
-func ToFontDifferences(differences map[byte]string) []core.PdfObject {
+func ToFontDifferences(differences map[byte]string) []PdfObject {
 	if len(differences) == 0 {
-		return []core.PdfObject{}
+		return []PdfObject{}
 	}
 
 	codes := []byte{}
@@ -189,12 +160,12 @@ func ToFontDifferences(differences map[byte]string) []core.PdfObject {
 	})
 
 	n := codes[0]
-	diffList := []core.PdfObject{core.MakeInteger(int64(n)), core.MakeName(differences[n])}
+	diffList := []PdfObject{MakeInteger(int64(n)), MakeName(differences[n])}
 	for _, c := range codes[1:] {
 		if c == n+1 {
-			diffList = append(diffList, core.MakeName(differences[c]))
+			diffList = append(diffList, MakeName(differences[c]))
 		} else {
-			diffList = append(diffList, core.MakeInteger(int64(c)))
+			diffList = append(diffList, MakeInteger(int64(c)))
 		}
 		n = c
 	}

@@ -5,7 +5,7 @@
 
 package textencoding
 
-import "github.com/unidoc/unidoc/pdf/core"
+import . "github.com/unidoc/unidoc/pdf/core"
 
 type TextEncoder interface {
 	// !@#$ This is copied between implmentations
@@ -37,13 +37,13 @@ type TextEncoder interface {
 	// The bool return flag is true if there was a match, and false otherwise.
 	GlyphToRune(glyph string) (rune, bool)
 
-	ToPdfObject() core.PdfObject
+	ToPdfObject() PdfObject
 }
 
 // Convenience functions
 
 // Encode
-func Encode(enc TextEncoder, raw string) string {
+func doEncode(enc TextEncoder, raw string) string {
 	encoded := []byte{}
 	for _, rune := range raw {
 		code, found := enc.RuneToCharcode(rune)
@@ -57,7 +57,7 @@ func Encode(enc TextEncoder, raw string) string {
 
 // Convert rune to character code.
 // The bool return flag is true if there was a match, and false otherwise.
-func RuneToCharcode(enc TextEncoder, val rune) (uint16, bool) {
+func doRuneToCharcode(enc TextEncoder, val rune) (uint16, bool) {
 	g, ok := enc.RuneToGlyph(val)
 	if !ok {
 		return 0, false
@@ -65,7 +65,7 @@ func RuneToCharcode(enc TextEncoder, val rune) (uint16, bool) {
 	return enc.GlyphToCharcode(g)
 }
 
-func CharcodeToRune(enc TextEncoder, code uint16) (rune, bool) {
+func doCharcodeToRune(enc TextEncoder, code uint16) (rune, bool) {
 	g, ok := enc.CharcodeToGlyph(code)
 	if !ok {
 		return 0, false

@@ -1,12 +1,28 @@
 /*
  * This file is subject to the terms and conditions defined in
  * file 'LICENSE.md', which is part of this source code package.
- */
+
+  createDefaultFont() throws IOException
+    {
+        COSDictionary dict = new COSDictionary();
+        dict.setItem(COSName.TYPE, COSName.FONT);
+        dict.setItem(COSName.SUBTYPE, COSName.TRUE_TYPE);
+        dict.setString(COSName.BASE_FONT, "Arial");
+        return createFont(dict);
+    }
+
+      // decode a character
+            int before = in.available();
+            int code = font.readCode(in);
+            int codeLength = before - in.available();
+            String unicode = font.toUnicode(code);
+*/
 
 package model
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/unidoc/unidoc/common"
 	. "github.com/unidoc/unidoc/pdf/core"
@@ -21,13 +37,34 @@ import (
 // - TrueType
 // etc.
 type PdfFont struct {
-	context interface{} // The underlying font: Type0, Type1, Truetype, etc..
+	// context interface{} // The underlying font: Type0, Type1, Truetype, etc..
+	context        fonts.Font
+	subtype        string
+	basefont       string
+	fontDescriptor *PdfFontDescriptor
+}
+
+func (font PdfFont) Type() string {
+	descriptor := font.fontDescriptor
+	charset := ""
+	if descriptor != nil {
+		charset, _ = GetName(descriptor.CharSet)
+	}
+
+	return fmt.Sprintf("%T %#q %#q %t %q", font.context, font.subtype, font.basefont,
+		descriptor != nil, charset)
+}
+
+func (font PdfFont) String() string {
+	return font.Type()
 }
 
 func (font PdfFont) CharcodeBytesToUnicode(codes []byte) string {
+	common.Log.Debug("CharcodeBytesToUnicode: font=%s", font)
 	if codemap := font.GetCMap(); codemap != nil {
 		return codemap.CharcodeBytesToUnicode(codes)
-	} else if encoder := font.Encoder(); encoder != nil {
+	}
+	if encoder := font.Encoder(); encoder != nil {
 		runes := []rune{}
 		for _, c := range codes {
 			r, ok := encoder.CharcodeToRune(uint16(c))
@@ -56,6 +93,34 @@ func (font PdfFont) GetCMap() *cmap.CMap {
 // Encoder returns the font's text encoder.
 func (font PdfFont) Encoder() textencoding.TextEncoder {
 	switch t := font.context.(type) {
+	case fonts.FontCourier:
+		return t.Encoder()
+	case fonts.FontCourierBold:
+		return t.Encoder()
+	case fonts.FontCourierBoldOblique:
+		return t.Encoder()
+	case fonts.FontCourierOblique:
+		return t.Encoder()
+	case fonts.FontHelvetica:
+		return t.Encoder()
+	case fonts.FontHelveticaBold:
+		return t.Encoder()
+	case fonts.FontHelveticaBoldOblique:
+		return t.Encoder()
+	case fonts.FontHelveticaOblique:
+		return t.Encoder()
+	case fonts.FontTimesRoman:
+		return t.Encoder()
+	case fonts.FontTimesBold:
+		return t.Encoder()
+	case fonts.FontTimesBoldItalic:
+		return t.Encoder()
+	case fonts.FontTimesItalic:
+		return t.Encoder()
+	case fonts.FontSymbol:
+		return t.Encoder()
+	case fonts.FontZapfDingbats:
+		return t.Encoder()
 	case *pdfFontSimple:
 		return t.Encoder()
 	case *pdfFontType0:
@@ -72,6 +137,34 @@ func (font PdfFont) Encoder() textencoding.TextEncoder {
 // !@#$ Is this only possible for simple fonts?
 func (font PdfFont) SetEncoder(encoder textencoding.TextEncoder) {
 	switch t := font.context.(type) {
+	case fonts.FontCourier:
+		t.SetEncoder(encoder)
+	case fonts.FontCourierBold:
+		t.SetEncoder(encoder)
+	case fonts.FontCourierBoldOblique:
+		t.SetEncoder(encoder)
+	case fonts.FontCourierOblique:
+		t.SetEncoder(encoder)
+	case fonts.FontHelvetica:
+		t.SetEncoder(encoder)
+	case fonts.FontHelveticaBold:
+		t.SetEncoder(encoder)
+	case fonts.FontHelveticaBoldOblique:
+		t.SetEncoder(encoder)
+	case fonts.FontHelveticaOblique:
+		t.SetEncoder(encoder)
+	case fonts.FontTimesRoman:
+		t.SetEncoder(encoder)
+	case fonts.FontTimesBold:
+		t.SetEncoder(encoder)
+	case fonts.FontTimesBoldItalic:
+		t.SetEncoder(encoder)
+	case fonts.FontTimesItalic:
+		t.SetEncoder(encoder)
+	case fonts.FontSymbol:
+		t.SetEncoder(encoder)
+	case fonts.FontZapfDingbats:
+		t.SetEncoder(encoder)
 	case *pdfFontSimple:
 		t.SetEncoder(encoder)
 	default:
@@ -121,7 +214,7 @@ func newPdfFontFromPdfObject(fontObj PdfObject, allowType0 bool) (*PdfFont, erro
 	if obj := d.Get("Type"); obj != nil {
 		oname, is := obj.(*PdfObjectName)
 		if !is || string(*oname) != "Font" {
-			common.Log.Debug("Incompatibility ERROR: Type (Required) defined but not Font name")
+			common.Log.Debug("Font Incompatibility ERROR: Type=%q Should be %q", string(*oname), "Font")
 			return nil, ErrRangeError
 		}
 	} else {
@@ -140,7 +233,10 @@ func newPdfFontFromPdfObject(fontObj PdfObject, allowType0 bool) (*PdfFont, erro
 		return nil, ErrTypeError
 	}
 
-	common.Log.Debug("@: Subtype=%q (%T)", subtype, subtype)
+	font.subtype = subtype
+	if basefont, err := GetName(d.Get("BaseFont")); err == nil {
+		font.basefont = basefont
+	}
 
 	switch subtype {
 	case "Type0":
@@ -148,21 +244,34 @@ func newPdfFontFromPdfObject(fontObj PdfObject, allowType0 bool) (*PdfFont, erro
 			common.Log.Debug("Loading type0 not allowed")
 			return nil, errors.New("Cyclical type0 loading error")
 		}
-		type0font, err := newPdfFontType0FromPdfObject(obj)
+		type0font, err := newPdfFontType0FromPdfObject(fontObj)
 		if err != nil {
 			common.Log.Debug("Error loading Type0 font: %v", err)
 			return nil, err
 		}
 		font.context = type0font
 	case "Type1", "Type3", "MMType1", "TrueType":
-		simplefont, err := newSimpleFontFromPdfObject(fontObj)
-		if err != nil {
-			common.Log.Debug("Error loading simple font: %v", simplefont)
-			return nil, err
+		if std, ok := fonts.Standard14Fonts[subtype]; ok && subtype == "Type1" {
+			font.context = std
+		} else {
+			simplefont, err := newSimpleFontFromPdfObject(fontObj, subtype, d)
+			if err != nil {
+				common.Log.Debug("Error loading simple font: Subtype=%q %v", subtype, err)
+				return nil, err
+			}
+			font.context = simplefont
 		}
-		font.context = simplefont
+	case "CIDFontType0":
+		common.Log.Debug("Unsupported font type: Subtype=%q ****", subtype)
+		return nil, ErrUnsupportedFont
+		// cidfont, err := newPdfFontType0FromPdfObject(fontObj)
+		// if err != nil {
+		// 	common.Log.Debug("Error loading cid font type0 font: %v", err)
+		// 	return nil, err
+		// }
+		// font.context = cidfont
 	case "CIDFontType2":
-		cidfont, err := newPdfCIDFontType2FromPdfObject(obj)
+		cidfont, err := newPdfCIDFontType2FromPdfObject(fontObj)
 		if err != nil {
 			common.Log.Debug("Error loading cid font type2 font: %v", err)
 			return nil, err
@@ -170,48 +279,20 @@ func newPdfFontFromPdfObject(fontObj PdfObject, allowType0 bool) (*PdfFont, erro
 		font.context = cidfont
 	default:
 		common.Log.Debug("Unsupported font type: Subtype=%q", subtype)
-		return nil, errors.New("Unsupported font type")
+		return nil, ErrUnsupportedFont
+	}
+
+	obj = d.Get("FontDescriptor")
+	if obj != nil {
+		fontDescriptor, err := newPdfFontDescriptorFromPdfObject(obj)
+		if err != nil {
+			panic(err)
+		}
+		if err == nil {
+			font.fontDescriptor = fontDescriptor
+		}
 	}
 	return font, nil
-}
-
-// getFontEncoding returns font encoding of `obj` the "Encoding" entry in a font dict
-// Table 114 – Entries in an encoding dictionary (page 263)
-func getFontEncoding(obj PdfObject) (string, map[byte]string, error) {
-	if obj == nil {
-		common.Log.Debug("Incompatibility ERROR: Font Encoding (Required) missing")
-		return "", nil, ErrRequiredAttributeMissing
-	}
-
-	switch encoding := obj.(type) {
-	case *PdfObjectName:
-		return string(*encoding), nil, nil
-	case *PdfObjectDictionary:
-		typ, err := GetName(encoding.Get("Type"))
-		if err != nil || typ != "Encoding" {
-			common.Log.Debug("Incompatibility ERROR: Bad font encoding dict. %+v Type=%q err=%v",
-				encoding, typ, err)
-			return "", nil, ErrTypeError
-		}
-		baseName, err := GetName(encoding.Get("BaseEncoding"))
-		if err != nil {
-			common.Log.Debug("Incompatibility ERROR: Bad font encoding dict. %+v BaseEncoding=%q err=%v",
-				encoding, baseName, err)
-			return "", nil, ErrTypeError
-		}
-		diffList, err := GetArray(encoding.Get("Differences"))
-		if err != nil {
-			common.Log.Debug("Incompatibility ERROR: Bad font encoding dict. %+v err=%v", encoding, err)
-			return "", nil, ErrTypeError
-		}
-
-		differences, err := textencoding.FromFontDifferences(diffList)
-		return baseName, differences, err
-	default:
-		common.Log.Debug("Incompatibility ERROR: encoding not a name or dict (%T) %s",
-			obj, obj.String())
-		return "", nil, ErrTypeError
-	}
 }
 
 // ToPdfObject converts the PdfFont object to its PDF representation.
@@ -296,19 +377,23 @@ func newPdfFontDescriptorFromPdfObject(obj PdfObject) (*PdfFontDescriptor, error
 		return nil, ErrTypeError
 	}
 
-	if obj := d.Get("Type"); obj != nil {
-		oname, is := obj.(*PdfObjectName)
-		if !is || string(*oname) != "FontDescriptor" {
-			common.Log.Debug("Incompatibility: Font descriptor Type invalid (%T)", obj)
-		}
-	} else {
-		common.Log.Debug("Incompatibility: Type (Required) missing")
-	}
-
 	if obj := d.Get("FontName"); obj != nil {
 		descriptor.FontName = obj
 	} else {
 		common.Log.Debug("Incompatibility: FontName (Required) missing")
+	}
+	fontname, _ := GetName(descriptor.FontName)
+
+	if obj := d.Get("Type"); obj != nil {
+		oname, is := obj.(*PdfObjectName)
+		if !is || string(*oname) != "FontDescriptor" {
+			common.Log.Debug("Incompatibility: Font descriptor Type invalid (%T) font=%q %T",
+				obj, fontname, descriptor.FontName)
+		}
+	} else {
+		common.Log.Trace("Incompatibility: Type (Required) missing. font=%q %T",
+			fontname, descriptor.FontName)
+		// return nil, errors.New("$$$$$")
 	}
 
 	descriptor.FontFamily = d.Get("FontFamily")
