@@ -37,13 +37,35 @@ import (
 // - TrueType
 // etc.
 type PdfFont struct {
-	context        fonts.Font // The underlying font: Type0, Type1, Truetype, etc..
-	subtype        string
-	basefont       string
-	dict           *PdfObjectDictionary
+	context fonts.Font // The underlying font: Type0, Type1, Truetype, etc..
+	dict    *PdfObjectDictionary
+
+	subtype  string
+	basefont string
+
 	BaseFont       PdfObject
 	Subtype        PdfObject
 	fontDescriptor *PdfFontDescriptor
+}
+
+func (font PdfFont) toDict(subtype string) *PdfObjectDictionary {
+	d := MakeDict()
+	d.Set("Type", MakeName("Font"))
+	if subtype != "" && font.subtype != "" {
+		common.Log.Debug("ERROR: toDict. Overriding subtype to %#q %s", subtype, font)
+	} else if subtype == "" && font.subtype == "" {
+		common.Log.Debug("ERROR: toDict. No subtype %s", font)
+	} else if font.subtype == "" {
+		font.subtype = subtype
+	}
+	d.Set("Subtype", MakeName(font.subtype))
+	if font.BaseFont != nil {
+		d.Set("BaseFont", font.BaseFont)
+	}
+	if font.fontDescriptor != nil {
+		d.Set("FontDescriptor", font.fontDescriptor.ToPdfObject())
+	}
+	return d
 }
 
 func (font PdfFont) String() string {
@@ -266,7 +288,7 @@ func newPdfFontFromPdfObject(fontObj PdfObject, allowType0 bool) (*PdfFont, erro
 			common.Log.Debug("ERROR: Loading type0 not allowed. font=%s", font)
 			return nil, errors.New("Cyclical type0 loading")
 		}
-		type0font, err := newPdfFontType0FromPdfObject(fontObj)
+		type0font, err := newPdfFontType0FromPdfObject(fontObj, font)
 		if err != nil {
 			common.Log.Debug("ERROR loading Type0 font: font=%s err=%v", font, err)
 			return nil, err

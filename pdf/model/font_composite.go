@@ -16,10 +16,9 @@ import (
 // associated CIDFont is called its descendant.
 type pdfFontType0 struct {
 	container *PdfIndirectObject
+	skeleton  *PdfFont
 
-	encoder textencoding.TextEncoder
-
-	BaseFont       *PdfObjectName
+	encoder        textencoding.TextEncoder
 	Encoding       PdfObject
 	DescendantFont *PdfFont // Can be either CIDFontType0 or CIDFontType2 font.
 	ToUnicode      PdfObject
@@ -52,15 +51,8 @@ func (font *pdfFontType0) ToPdfObject() PdfObject {
 	if font.container == nil {
 		font.container = &PdfIndirectObject{}
 	}
-	d := MakeDict()
-	font.container.PdfObject = d
+	d := font.skeleton.toDict("Type0")
 
-	d.Set("Type", MakeName("Font"))
-	d.Set("Subtype", MakeName("Type0"))
-
-	if font.BaseFont != nil {
-		d.Set("BaseFont", font.BaseFont)
-	}
 	if font.Encoding != nil {
 		d.Set("Encoding", font.Encoding)
 	}
@@ -77,68 +69,9 @@ func (font *pdfFontType0) ToPdfObject() PdfObject {
 
 // newPdfFontType0FromPdfObject makes a pdfFontType0 based on the input PdfObject which should be
 // represented by a dictionary. If a problem is encountered, an error is returned.
-func newPdfFontType0FromPdfObject(obj PdfObject) (*pdfFontType0, error) {
-	font := &pdfFontType0{}
+func newPdfFontType0FromPdfObject(obj PdfObject, skeleton *PdfFont) (*pdfFontType0, error) {
 
-	dictObj := obj
-	if ind, is := obj.(*PdfIndirectObject); is {
-		dictObj = ind.PdfObject
-	}
-
-	d, ok := dictObj.(*PdfObjectDictionary)
-	if !ok {
-		common.Log.Debug("Font not given by a dictionary %s (%T)", dictObj, dictObj)
-		return nil, ErrTypeError
-	}
-
-	// Type.
-	if obj := d.Get("Type"); obj != nil {
-		oname, is := obj.(*PdfObjectName)
-		if !is || string(*oname) != "Font" {
-			common.Log.Debug("Incompatibility ERROR: Type (Required) defined but not Font name")
-			return nil, ErrRangeError
-		}
-	} else {
-		common.Log.Debug("Incompatibility ERROR: Type (Required) missing")
-		return nil, ErrRequiredAttributeMissing
-	}
-
-	// Subtype.
-	obj = d.Get("Subtype")
-	if obj == nil {
-		common.Log.Debug("Incompatibility ERROR: Subtype (Required) missing")
-		return nil, ErrRequiredAttributeMissing
-	}
-	name, ok := obj.(*PdfObjectName)
-	if !ok {
-		return nil, ErrTypeError
-	}
-	if *name != "Type0" {
-		common.Log.Debug("Font SubType != Type0 (%s) dict=%s", *name, d)
-		return nil, ErrRangeError
-	}
-
-	// BaseFont.
-	obj = d.Get("BaseFont")
-	if obj == nil {
-		common.Log.Debug("Incompatibility ERROR: Subtype (Required) missing")
-		return nil, errors.New("Required attribute missing")
-	}
-	name, ok = obj.(*PdfObjectName)
-	if !ok {
-		return nil, ErrTypeError
-	}
-	font.BaseFont = name
-
-	// Encoding.
-	obj = TraceToDirectObject(d.Get("Encoding"))
-	switch obj.(type) {
-	case *PdfObjectName, *PdfObjectStream:
-		font.Encoding = obj
-	default:
-		common.Log.Debug("Invalid Encoding entry (%T)", obj)
-		return nil, ErrRangeError
-	}
+	d := skeleton.dict
 
 	// DescendantFonts.
 	obj = TraceToDirectObject(d.Get("DescendantFonts"))
@@ -156,6 +89,8 @@ func newPdfFontType0FromPdfObject(obj PdfObject) (*pdfFontType0, error) {
 		common.Log.Debug("Failed loading descendant font: %v", err)
 		return nil, err
 	}
+
+	font := &pdfFontType0{}
 	font.DescendantFont = df
 
 	// ToUnicode.
@@ -168,12 +103,10 @@ func newPdfFontType0FromPdfObject(obj PdfObject) (*pdfFontType0, error) {
 // pdfCIDFontType2 represents a CIDFont Type2 font dictionary.
 type pdfCIDFontType2 struct {
 	container *PdfIndirectObject
+	skeleton  *PdfFont // Elements common to all font types
 
 	encoder   textencoding.TextEncoder
 	ttfParser *fonts.TtfType
-
-	BaseFont       *PdfObjectName
-	FontDescriptor *PdfFontDescriptor
 
 	CIDSystemInfo PdfObject
 	DW            PdfObject
@@ -228,18 +161,8 @@ func (font *pdfCIDFontType2) ToPdfObject() PdfObject {
 	if font.container == nil {
 		font.container = &PdfIndirectObject{}
 	}
-	d := MakeDict()
+	d := font.skeleton.toDict("CIDFontType2")
 	font.container.PdfObject = d
-
-	d.Set("Type", MakeName("Font"))
-	d.Set("Subtype", MakeName("CIDFontType2"))
-
-	if font.BaseFont != nil {
-		d.Set("BaseFont", font.BaseFont)
-	}
-	if font.FontDescriptor != nil {
-		d.Set("FontDescriptor", font.FontDescriptor.ToPdfObject())
-	}
 
 	if font.CIDSystemInfo != nil {
 		d.Set("CIDSystemInfo", font.CIDSystemInfo)
@@ -289,13 +212,6 @@ func newPdfCIDFontType2FromPdfObject(obj PdfObject, skeleton *PdfFont) (*pdfCIDF
 		return nil, ErrRequiredAttributeMissing
 	}
 
-	fd, err := newPdfFontDescriptorFromPdfObject(obj)
-	if err != nil {
-		common.Log.Debug("Error loading font desciptor: %v\n", err)
-		return nil, err
-	}
-	font.FontDescriptor = fd
-
 	// Optional attributes.
 	font.DW = d.Get("DW")
 	font.W = d.Get("W")
@@ -320,7 +236,8 @@ func NewCompositePdfFontFromTTFFile(filePath string) (*PdfFont, error) {
 	}
 
 	// Prepare the inner descendant font (CIDFontType2).
-	cidfont := &pdfCIDFontType2{}
+	skeleton := &PdfFont{}
+	cidfont := &pdfCIDFontType2{skeleton: skeleton}
 	cidfont.ttfParser = &ttf
 
 	// 2-byte character codes. -> runes
@@ -332,7 +249,7 @@ func NewCompositePdfFontFromTTFFile(filePath string) (*PdfFont, error) {
 		return runes[i] < runes[j]
 	})
 
-	cidfont.BaseFont = MakeName(ttf.PostScriptName)
+	skeleton.BaseFont = MakeName(ttf.PostScriptName)
 
 	k := 1000.0 / float64(ttf.UnitsPerEm)
 
@@ -434,11 +351,11 @@ func NewCompositePdfFontFromTTFFile(filePath string) (*PdfFont, error) {
 	flags |= 1 << 2 // Symbolic.
 	descriptor.Flags = MakeInteger(int64(flags))
 
-	cidfont.FontDescriptor = descriptor
+	skeleton.fontDescriptor = descriptor
 
 	// Make root Type0 font.
 	type0 := pdfFontType0{
-		BaseFont:       cidfont.BaseFont,
+		skeleton:       &PdfFont{BaseFont: skeleton.BaseFont, basefont: skeleton.basefont},
 		DescendantFont: &PdfFont{context: cidfont, subtype: "Type0"},
 		Encoding:       MakeName("Identity-H"),
 		encoder:        textencoding.NewTrueTypeFontEncoder(ttf.Chars),

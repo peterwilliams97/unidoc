@@ -28,25 +28,23 @@ import (
 //   containing font-wide metrics and other attributes of the font; see 9.8, "Font Descriptors".
 //   Among those attributes is an optional font filestream containing the font program.
 type pdfFontSimple struct {
-	skeleton *PdfFont // Elements common to all font types
+	container *PdfIndirectObject
+	skeleton  *PdfFont // Elements common to all font types
 
-	encoder    textencoding.TextEncoder
 	firstChar  int
 	lastChar   int
 	charWidths []float64
+	encoder    textencoding.TextEncoder
 
 	// Encoding is subject to limitations that are described in 9.6.6, "Character Encoding".
 	// BaseFont is derived differently.
-	FirstChar      PdfObject
-	LastChar       PdfObject
-	Widths         PdfObject
-	FontDescriptor *PdfFontDescriptor
-	Encoding       PdfObject
-	ToUnicode      PdfObject
+	FirstChar PdfObject
+	LastChar  PdfObject
+	Widths    PdfObject
+	Encoding  PdfObject
+	ToUnicode PdfObject
 
 	CMap *cmap.CMap
-
-	container *PdfIndirectObject
 }
 
 // Encoder returns the font's text encoder.
@@ -165,17 +163,7 @@ func newSimpleFontFromPdfObject(obj PdfObject, skeleton *PdfFont) (*pdfFontSimpl
 		common.Log.Debug("Invalid widths length != %d (%d)", font.lastChar-font.firstChar+1, len(widths))
 		return nil, ErrRangeError
 	}
-
 	font.charWidths = widths
-
-	if obj := d.Get("FontDescriptor"); obj != nil {
-		descriptor, err := newPdfFontDescriptorFromPdfObject(obj)
-		if err != nil {
-			common.Log.Debug("Error loading font descriptor: %v", err)
-			return nil, err
-		}
-		font.FontDescriptor = descriptor
-	}
 
 	font.Encoding = TraceToDirectObject(d.Get("Encoding"))
 	font.ToUnicode = TraceToDirectObject(d.Get("ToUnicode"))
@@ -253,15 +241,9 @@ func (this *pdfFontSimple) ToPdfObject() PdfObject {
 	if this.container == nil {
 		this.container = &PdfIndirectObject{}
 	}
-	d := MakeDict()
+	d := this.skeleton.toDict("")
 	this.container.PdfObject = d
 
-	d.Set("Type", MakeName("Font"))
-	d.Set("Subtype", this.skeleton.Subtype)
-
-	if this.skeleton.BaseFont != nil {
-		d.Set("BaseFont", this.skeleton.BaseFont)
-	}
 	if this.FirstChar != nil {
 		d.Set("FirstChar", this.FirstChar)
 	}
@@ -270,9 +252,6 @@ func (this *pdfFontSimple) ToPdfObject() PdfObject {
 	}
 	if this.Widths != nil {
 		d.Set("Widths", this.Widths)
-	}
-	if this.FontDescriptor != nil {
-		d.Set("FontDescriptor", this.FontDescriptor.ToPdfObject())
 	}
 	if this.Encoding != nil {
 		d.Set("Encoding", this.Encoding)
@@ -294,7 +273,8 @@ func NewPdfFontFromTTFFile(filePath string) (*PdfFont, error) {
 		return nil, err
 	}
 
-	truefont := &pdfFontSimple{}
+	skeleton := &PdfFont{}
+	truefont := &pdfFontSimple{skeleton: skeleton}
 
 	// TODO: Make more generic to allow customization... Need to know which glyphs are to be used,
 	// then can derive
@@ -387,10 +367,9 @@ func NewPdfFontFromTTFFile(filePath string) (*PdfFont, error) {
 	descriptor.Flags = MakeInteger(int64(flags))
 
 	// Build Font.
-	truefont.FontDescriptor = descriptor
+	truefont.skeleton.fontDescriptor = descriptor
 
-	font := &PdfFont{}
-	font.context = truefont
+	font := &PdfFont{context: truefont}
 
 	return font, nil
 }
