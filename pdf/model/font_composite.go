@@ -25,8 +25,8 @@ type pdfFontType0 struct {
 	ToUnicode      PdfObject
 }
 
-// GetGlyphCharMetrics returns the character metrics for the specified glyph.  A bool flag is returned to
-// indicate whether or not the entry was found in the glyph to charcode mapping.
+// GetGlyphCharMetrics returns the character metrics for the specified glyph.  A bool flag is
+// returned to indicate whether or not the entry was found in the glyph to charcode mapping.
 func (font pdfFontType0) GetGlyphCharMetrics(glyph string) (fonts.CharMetrics, bool) {
 	metrics := fonts.CharMetrics{}
 
@@ -114,7 +114,7 @@ func newPdfFontType0FromPdfObject(obj PdfObject) (*pdfFontType0, error) {
 		return nil, ErrTypeError
 	}
 	if *name != "Type0" {
-		common.Log.Debug("Font SubType != Type0 (%s)", *name)
+		common.Log.Debug("Font SubType != Type0 (%s) dict=%s", *name, d)
 		return nil, ErrRangeError
 	}
 
@@ -369,8 +369,8 @@ func NewCompositePdfFontFromTTFFile(filePath string) (*PdfFont, error) {
 
 	// 2-byte character codes. -> runes
 	runes := []uint16{}
-	for rune, _ := range ttf.Chars {
-		runes = append(runes, rune)
+	for r := range ttf.Chars {
+		runes = append(runes, r)
 	}
 	sort.Slice(runes, func(i, j int) bool {
 		return runes[i] < runes[j]
@@ -412,7 +412,6 @@ func NewCompositePdfFontFromTTFFile(filePath string) (*PdfFont, error) {
 			if runeToWidthMap[runes[i]] != runeToWidthMap[runes[j]] {
 				break
 			}
-
 			j++
 		}
 
@@ -446,7 +445,7 @@ func NewCompositePdfFontFromTTFFile(filePath string) (*PdfFont, error) {
 	descriptor.ItalicAngle = MakeFloat(float64(ttf.ItalicAngle))
 	descriptor.MissingWidth = MakeFloat(k * float64(ttf.Widths[0]))
 
-	// Embed the Trutype font program.
+	// Embed the TrueType font program.
 	ttfBytes, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		common.Log.Debug("Unable to read file contents: %v", err)
@@ -482,16 +481,15 @@ func NewCompositePdfFontFromTTFFile(filePath string) (*PdfFont, error) {
 	cidfont.FontDescriptor = descriptor
 
 	// Make root Type0 font.
-	type0 := &pdfFontType0{}
-	type0.BaseFont = cidfont.BaseFont
-	type0.DescendantFont = &PdfFont{context: cidfont, subtype: "Type0"}
-	type0.Encoding = MakeName("Identity-H")
-
-	type0.encoder = textencoding.NewTrueTypeFontEncoder(ttf.Chars)
+	type0 := pdfFontType0{
+		BaseFont:       cidfont.BaseFont,
+		DescendantFont: &PdfFont{context: cidfont, subtype: "Type0"},
+		Encoding:       MakeName("Identity-H"),
+		encoder:        textencoding.NewTrueTypeFontEncoder(ttf.Chars),
+	}
 
 	// Build Font.
-	font := &PdfFont{}
-	font.context = type0
+	font := PdfFont{context: &type0}
 
-	return font, nil
+	return &font, nil
 }
