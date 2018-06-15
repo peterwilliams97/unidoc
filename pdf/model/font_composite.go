@@ -265,58 +265,14 @@ func (font *pdfCIDFontType2) ToPdfObject() PdfObject {
 
 // newPdfCIDFontType2FromPdfObject creates a pdfCIDFontType2 object from a dictionary (either direct
 // or via indirect object). If a problem occurs with loading an error is returned.
-func newPdfCIDFontType2FromPdfObject(obj PdfObject) (*pdfCIDFontType2, error) {
-	font := &pdfCIDFontType2{}
-
-	dictObj := obj
-	if ind, is := obj.(*PdfIndirectObject); is {
-		dictObj = ind.PdfObject
-	}
-
-	d, ok := dictObj.(*PdfObjectDictionary)
-	if !ok {
-		common.Log.Debug("Font not given by a dictionary (%T)", obj)
-		return nil, ErrTypeError
-	}
-
-	// Type.
-	if obj := d.Get("Type"); obj != nil {
-		oname, is := obj.(*PdfObjectName)
-		if !is || string(*oname) != "Font" {
-			common.Log.Debug("Incompatibility ERROR: Type (Required) defined but not Font name")
-			return nil, ErrRangeError
-		}
-	} else {
-		common.Log.Debug("Incompatibility ERROR: Type (Required) missing")
-		return nil, ErrRequiredAttributeMissing
-	}
-
-	// Subtype.
-	obj = d.Get("Subtype")
-	if obj == nil {
-		common.Log.Debug("Incompatibility ERROR: Subtype (Required) missing")
-		return nil, ErrRequiredAttributeMissing
-	}
-	name, ok := obj.(*PdfObjectName)
-	if !ok {
-		return nil, ErrTypeError
-	}
-	if *name != "CIDFontType2" {
-		common.Log.Debug("Font SubType != CIDFontType2 (%s)", *name)
+func newPdfCIDFontType2FromPdfObject(obj PdfObject, skeleton *PdfFont) (*pdfCIDFontType2, error) {
+	if skeleton.subtype != "CIDFontType2" {
+		common.Log.Debug("Font SubType != CIDFontType2 (%s) font=%s", skeleton)
 		return nil, ErrRangeError
 	}
 
-	// BaseFont.
-	obj = d.Get("BaseFont")
-	if obj == nil {
-		common.Log.Debug("BaseFont (Required) missing")
-		return nil, ErrRequiredAttributeMissing
-	}
-	name, ok = obj.(*PdfObjectName)
-	if !ok {
-		return nil, ErrTypeError
-	}
-	font.BaseFont = name
+	font := &pdfCIDFontType2{}
+	d := skeleton.dict
 
 	// CIDSystemInfo.
 	obj = d.Get("CIDSystemInfo")

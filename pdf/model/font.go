@@ -37,10 +37,10 @@ import (
 // - TrueType
 // etc.
 type PdfFont struct {
-	context  fonts.Font // The underlying font: Type0, Type1, Truetype, etc..
-	subtype  string
-	basefont string
-
+	context        fonts.Font // The underlying font: Type0, Type1, Truetype, etc..
+	subtype        string
+	basefont       string
+	dict           *PdfObjectDictionary
 	BaseFont       PdfObject
 	Subtype        PdfObject
 	fontDescriptor *PdfFontDescriptor
@@ -192,7 +192,7 @@ func NewPdfFontFromPdfObject(fontObj PdfObject) (*PdfFont, error) {
 // returned.
 // The allowType0 indicates whether loading Type0 font should be supported.  Flag used to avoid
 // cyclical loading.
-func newPdfFontFromPdfObject(fontObj PdfObject, allowType0 bool) (*PdfFont, error) {
+func newFontSkeletonFromPdfObject(fontObj PdfObject) (*PdfFont, error) {
 	font := &PdfFont{}
 
 	dictObj := fontObj
@@ -205,6 +205,7 @@ func newPdfFontFromPdfObject(fontObj PdfObject, allowType0 bool) (*PdfFont, erro
 		common.Log.Debug("Font not given by a dictionary (%T)", fontObj)
 		return nil, ErrTypeError
 	}
+	font.dict = d
 
 	basefont, err := GetName(d.Get("BaseFont"))
 	if err == nil {
@@ -235,7 +236,31 @@ func newPdfFontFromPdfObject(fontObj PdfObject, allowType0 bool) (*PdfFont, erro
 	}
 	font.subtype = subtype
 
-	switch subtype {
+	obj = d.Get("FontDescriptor")
+	if obj != nil {
+		fontDescriptor, err := newPdfFontDescriptorFromPdfObject(obj)
+		if err != nil {
+			panic(err)
+		}
+		if err == nil {
+			font.fontDescriptor = fontDescriptor
+		}
+	}
+
+	return font, nil
+}
+
+// newPdfFontFromPdfObject loads a PdfFont from a dictionary.  If there is a problem an error is
+// returned.
+// The allowType0 indicates whether loading Type0 font should be supported.  Flag used to avoid
+// cyclical loading.
+func newPdfFontFromPdfObject(fontObj PdfObject, allowType0 bool) (*PdfFont, error) {
+	font, err := newFontSkeletonFromPdfObject(fontObj)
+	if err != nil {
+		return nil, err
+	}
+
+	switch font.subtype {
 	case "Type0":
 		if !allowType0 {
 			common.Log.Debug("ERROR: Loading type0 not allowed. font=%s", font)
@@ -248,10 +273,10 @@ func newPdfFontFromPdfObject(fontObj PdfObject, allowType0 bool) (*PdfFont, erro
 		}
 		font.context = type0font
 	case "Type1", "Type3", "MMType1", "TrueType":
-		if std, ok := fonts.Standard14Fonts[basefont]; ok && subtype == "Type1" {
+		if std, ok := fonts.Standard14Fonts[font.basefont]; ok && font.subtype == "Type1" {
 			font.context = std
 		} else {
-			simplefont, err := newSimpleFontFromPdfObject(fontObj, font, d)
+			simplefont, err := newSimpleFontFromPdfObject(fontObj, font)
 			if err != nil {
 				common.Log.Debug("ERROR: loading simple font: font=%s err=%v", font, err)
 				return nil, err
@@ -259,7 +284,7 @@ func newPdfFontFromPdfObject(fontObj PdfObject, allowType0 bool) (*PdfFont, erro
 			font.context = simplefont
 		}
 	case "CIDFontType0":
-		common.Log.Debug("Unsupported font type: Subtype=%q *** font=%s", subtype, font)
+		common.Log.Debug("Unsupported font type: *** font=%s", font)
 		return nil, ErrUnsupportedFont
 		// cidfont, err := newPdfFontType0FromPdfObject(fontObj)
 		// if err != nil {
@@ -268,27 +293,17 @@ func newPdfFontFromPdfObject(fontObj PdfObject, allowType0 bool) (*PdfFont, erro
 		// }
 		// font.context = cidfont
 	case "CIDFontType2":
-		cidfont, err := newPdfCIDFontType2FromPdfObject(fontObj)
+		cidfont, err := newPdfCIDFontType2FromPdfObject(fontObj, font)
 		if err != nil {
 			common.Log.Debug("ERROR: loading cid font type2 font. font=%s err=%v", font, err)
 			return nil, err
 		}
 		font.context = cidfont
 	default:
-		common.Log.Debug("ERROR: Unsupported font type: Subtype=%q font=%s", subtype, font)
+		common.Log.Debug("ERROR: Unsupported font type: font=%s", font)
 		return nil, ErrUnsupportedFont
 	}
 
-	obj = d.Get("FontDescriptor")
-	if obj != nil {
-		fontDescriptor, err := newPdfFontDescriptorFromPdfObject(obj)
-		if err != nil {
-			panic(err)
-		}
-		if err == nil {
-			font.fontDescriptor = fontDescriptor
-		}
-	}
 	return font, nil
 }
 
