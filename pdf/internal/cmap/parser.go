@@ -8,12 +8,11 @@ package cmap
 import (
 	"bufio"
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"strconv"
-
-	"encoding/hex"
 
 	"github.com/unidoc/unidoc/common"
 	"github.com/unidoc/unidoc/pdf/core"
@@ -273,7 +272,6 @@ func (p *cMapParser) parseHexString() (cmapHexString, error) {
 
 	buf := bytes.Buffer{}
 
-	//tmp := []byte{}
 	for {
 		p.skipSpaces()
 
@@ -365,7 +363,7 @@ func (p *cMapParser) parseDict() (cmapDict, error) {
 		key, err := p.parseName()
 		common.Log.Trace("Key: %s", key.Name)
 		if err != nil {
-			common.Log.Debug("ERROR Returning name err %s", err)
+			common.Log.Debug("ERROR: Returning name err %s", err)
 			return dict, err
 		}
 

@@ -46,43 +46,35 @@ func (cmap *CMap) Type() int {
 	return cmap.ctype
 }
 
+// Maximum number of possible bytes per code.
+const maxLen = 4
+
 // CharcodeBytesToUnicode converts a byte array of charcodes to a unicode string representation.
 func (cmap *CMap) CharcodeBytesToUnicode(src []byte) string {
 	var buf bytes.Buffer
 
-	// Maximum number of possible bytes per code.
-	maxLen := 4
-
-	i := 0
-	for i < len(src) {
-		var code uint64
-		var j int
+	j := 0
+	for i := 0; i < len(src); i += j + 1 {
+		// code is used to test the 4 candidate charcodes starting at src[i]
+		code := uint64(0)
 		for j = 0; j < maxLen && i+j < len(src); j++ {
-			b := src[i+j]
-
-			code <<= 8
-			code |= uint64(b)
-
-			tgt, has := cmap.codeMap[j][code]
-			if has {
-				buf.WriteString(tgt)
-				break
-			} else if j == maxLen-1 || i+j == len(src)-1 {
+			code <<= 8 // multibyte charcodes are bigendian in codeMap
+			code |= uint64(src[i+j])
+			if c, has := cmap.codeMap[j][code]; has {
+				buf.WriteString(c)
 				break
 			}
 		}
-		i += j + 1
 	}
-
 	return buf.String()
 }
 
 // CharcodeToUnicode converts a single character code to unicode string.
 // Note that CharcodeBytesToUnicode is typically more efficient.
-func (cmap *CMap) CharcodeToUnicode(srcCode uint64) string {
+func (cmap *CMap) CharcodeToUnicode(code uint64) string {
 	// Search through different code lengths.
-	for numBytes := 1; numBytes <= 4; numBytes++ {
-		if c, has := cmap.codeMap[numBytes-1][srcCode]; has {
+	for j := 0; j < maxLen; j++ {
+		if c, has := cmap.codeMap[j][code]; has {
 			return c
 		}
 	}
@@ -97,10 +89,10 @@ func newCMap() *CMap {
 	cmap.codespaces = []codespace{}
 	cmap.codeMap = [4]map[uint64]string{}
 	// Maps for 1-4 bytes are initialized. Minimal overhead if not used (most commonly used are 1-2 bytes).
-	cmap.codeMap[0] = map[uint64]string{}
-	cmap.codeMap[1] = map[uint64]string{}
-	cmap.codeMap[2] = map[uint64]string{}
-	cmap.codeMap[3] = map[uint64]string{}
+	cmap.codeMap[0] = map[uint64]string{} // 1 byte code map
+	cmap.codeMap[1] = map[uint64]string{} // 2 byte code map
+	cmap.codeMap[2] = map[uint64]string{} // 3 byte code map
+	cmap.codeMap[3] = map[uint64]string{} // 4 byte code map
 	return cmap
 }
 
@@ -111,11 +103,7 @@ func LoadCmapFromData(data []byte) (*CMap, error) {
 	cmap.cMapParser = newCMapParser(data)
 
 	err := cmap.parse()
-	if err != nil {
-		return cmap, err
-	}
-
-	return cmap, nil
+	return cmap, err
 }
 
 // parse parses the CMap file and loads into the CMap structure.

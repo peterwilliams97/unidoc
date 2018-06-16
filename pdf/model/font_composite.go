@@ -2,6 +2,7 @@ package model
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"sort"
 
@@ -77,25 +78,169 @@ func newPdfFontType0FromPdfObject(obj PdfObject, skeleton *PdfFont) (*pdfFontTyp
 	obj = TraceToDirectObject(d.Get("DescendantFonts"))
 	arr, ok := obj.(*PdfObjectArray)
 	if !ok {
-		common.Log.Debug("Invalid DescendantFonts - not an array (%T)", obj)
+		common.Log.Debug("ERROR: Invalid DescendantFonts - not an array (%T) %s", obj, skeleton)
 		return nil, ErrRangeError
 	}
 	if len(*arr) != 1 {
-		common.Log.Debug("Array length != 1 (%d)", len(*arr))
+		common.Log.Debug("ERROR: Array length != 1 (%d)", len(*arr))
 		return nil, ErrRangeError
 	}
 	df, err := newPdfFontFromPdfObject((*arr)[0], false)
 	if err != nil {
-		common.Log.Debug("Failed loading descendant font: %v", err)
+		common.Log.Debug("ERROR: Failed loading descendant font: err=%v %s", err, skeleton)
 		return nil, err
 	}
 
-	font := &pdfFontType0{}
-	font.DescendantFont = df
+	font := &pdfFontType0{
+		DescendantFont: df,
+		ToUnicode:      TraceToDirectObject(d.Get("ToUnicode")),
+	}
 
-	// ToUnicode.
-	obj = TraceToDirectObject(d.Get("ToUnicode"))
-	font.ToUnicode = obj
+	return font, nil
+}
+
+// CIDSystemInfo=Dict("Registry": Adobe, "Ordering": Korea1, "Supplement": 0, )
+type CIDSystemInfo struct {
+	Registry   string
+	Ordering   string
+	Supplement int
+}
+
+func newCIDSystemInfo(info PdfObject) CIDSystemInfo {
+	info = TraceToDirectObject(info)
+	d := *info.(*PdfObjectDictionary)
+	registry, _ := GetString(d.Get("Registry"))
+	ordering, _ := GetString(d.Get("Ordering"))
+	supplement, _ := GetNumberAsInt(d.Get("Supplement"))
+	return CIDSystemInfo{
+		Registry:   registry,
+		Ordering:   ordering,
+		Supplement: supplement,
+	}
+}
+
+// pdfCIDFontType0 represents a CIDFont Type0 font dictionary.
+type pdfCIDFontType0 struct {
+	container *PdfIndirectObject
+	skeleton  *PdfFont // Elements common to all font types
+
+	encoder   textencoding.TextEncoder
+	ttfParser *fonts.TtfType
+
+	CIDSystemInfo PdfObject
+	DW            PdfObject
+	W             PdfObject
+	DW2           PdfObject
+	W2            PdfObject
+	CIDToGIDMap   PdfObject
+
+	// Mapping between unicode runes to widths.
+	runeToWidthMap map[uint16]int
+
+	// Also mapping between GIDs (glyph index) and width.
+	gidToWidthMap map[uint16]int
+}
+
+// Encoder returns the font's text encoder.
+func (font pdfCIDFontType0) Encoder() textencoding.TextEncoder {
+	return font.encoder
+}
+
+// SetEncoder sets the encoder for the truetype font.
+func (font pdfCIDFontType0) SetEncoder(encoder textencoding.TextEncoder) {
+	font.encoder = encoder
+}
+
+// GetGlyphCharMetrics returns the character metrics for the specified glyph.  A bool flag is
+// returned to indicate whether or not the entry was found in the glyph to charcode mapping.
+func (font pdfCIDFontType0) GetGlyphCharMetrics(glyph string) (fonts.CharMetrics, bool) {
+	metrics := fonts.CharMetrics{}
+
+	enc := textencoding.NewTrueTypeFontEncoder(font.ttfParser.Chars)
+
+	// Convert the glyph to character code.
+	rune, found := enc.GlyphToRune(glyph)
+	if !found {
+		common.Log.Debug("Unable to convert glyph %s to charcode (identity)", glyph)
+		return metrics, false
+	}
+
+	w, found := font.runeToWidthMap[uint16(rune)]
+	if !found {
+		return metrics, false
+	}
+	metrics.GlyphName = glyph
+	metrics.Wx = float64(w)
+
+	return metrics, true
+}
+
+// ToPdfObject converts the pdfCIDFontType2 to a PDF representation.
+func (font *pdfCIDFontType0) ToPdfObject() PdfObject {
+	if font.container == nil {
+		font.container = &PdfIndirectObject{}
+	}
+	d := font.skeleton.toDict("CIDFontType2")
+	font.container.PdfObject = d
+
+	if font.CIDSystemInfo != nil {
+		d.Set("CIDSystemInfo", font.CIDSystemInfo)
+	}
+	if font.DW != nil {
+		d.Set("DW", font.DW)
+	}
+	if font.DW2 != nil {
+		d.Set("DW2", font.DW2)
+	}
+	if font.W != nil {
+		d.Set("W", font.W)
+	}
+	if font.W2 != nil {
+		d.Set("W2", font.W2)
+	}
+	if font.CIDToGIDMap != nil {
+		d.Set("CIDToGIDMap", font.CIDToGIDMap)
+	}
+
+	return font.container
+}
+
+// newPdfCIDFontType0FromPdfObject creates a pdfCIDFontType0 object from a dictionary (either direct
+// or via indirect object). If a problem occurs with loading an error is returned.
+func newPdfCIDFontType0FromPdfObject(obj PdfObject, skeleton *PdfFont) (*pdfCIDFontType0, error) {
+	if skeleton.subtype != "CIDFontType0" {
+		common.Log.Debug("ERROR: Font SubType != CIDFontType0. font=%s", skeleton)
+		return nil, ErrRangeError
+	}
+
+	font := &pdfCIDFontType0{skeleton: skeleton}
+	d := skeleton.dict
+
+	// CIDSystemInfo.
+	obj = TraceToDirectObject(d.Get("CIDSystemInfo"))
+	if obj == nil {
+		common.Log.Debug("CIDSystemInfo (Required) missing")
+		panic("lllll")
+		return nil, ErrRequiredAttributeMissing
+	}
+	font.CIDSystemInfo = obj
+
+	// Optional attributes.
+	font.DW = TraceToDirectObject(d.Get("DW"))
+	font.W = TraceToDirectObject(d.Get("W"))
+	font.DW2 = TraceToDirectObject(d.Get("DW2"))
+	font.W2 = TraceToDirectObject(d.Get("W2"))
+	font.CIDToGIDMap = d.Get("CIDToGIDMap")
+
+	// d=[BaseFont CIDSystemInfo DW FontDescriptor Subtype Type W]
+	fmt.Println("############################&&$$$$$$$$$$$$$$$$$$$$$$")
+	fmt.Printf("d=%s\n", d.Keys())
+	fmt.Printf(" CIDSystemInfo=%s\n", font.CIDSystemInfo)
+	fmt.Printf(" CIDSystemInfo=%#v\n", newCIDSystemInfo(font.CIDSystemInfo))
+	fmt.Printf("   W=%s\n", font.W)
+	fmt.Printf("  DW=%s\n", font.DW)
+	fmt.Printf("skeleton=%s\n", skeleton)
+	fmt.Printf("font=%#v\n", font)
 
 	return font, nil
 }
@@ -190,27 +335,20 @@ func (font *pdfCIDFontType2) ToPdfObject() PdfObject {
 // or via indirect object). If a problem occurs with loading an error is returned.
 func newPdfCIDFontType2FromPdfObject(obj PdfObject, skeleton *PdfFont) (*pdfCIDFontType2, error) {
 	if skeleton.subtype != "CIDFontType2" {
-		common.Log.Debug("Font SubType != CIDFontType2 (%s) font=%s", skeleton)
+		common.Log.Debug("ERROR: Font SubType != CIDFontType2. font=%s", skeleton)
 		return nil, ErrRangeError
 	}
 
-	font := &pdfCIDFontType2{}
+	font := &pdfCIDFontType2{skeleton: skeleton}
 	d := skeleton.dict
 
 	// CIDSystemInfo.
 	obj = d.Get("CIDSystemInfo")
 	if obj == nil {
-		common.Log.Debug("CIDSystemInfo (Required) missing")
+		common.Log.Debug("ERROR: CIDSystemInfo (Required) missing. font=%s", skeleton)
 		return nil, ErrRequiredAttributeMissing
 	}
 	font.CIDSystemInfo = obj
-
-	// FontDescriptor.
-	obj = d.Get("FontDescriptor")
-	if obj == nil {
-		common.Log.Debug("FontDescriptor (Required) missing")
-		return nil, ErrRequiredAttributeMissing
-	}
 
 	// Optional attributes.
 	font.DW = d.Get("DW")
@@ -231,7 +369,7 @@ func NewCompositePdfFontFromTTFFile(filePath string) (*PdfFont, error) {
 	// Load the truetype font data.
 	ttf, err := fonts.TtfParse(filePath)
 	if err != nil {
-		common.Log.Debug("Error loading ttf font: %v", err)
+		common.Log.Debug("ERROR: while loading ttf font: %v", err)
 		return nil, err
 	}
 
@@ -240,7 +378,7 @@ func NewCompositePdfFontFromTTFFile(filePath string) (*PdfFont, error) {
 	cidfont := &pdfCIDFontType2{skeleton: skeleton}
 	cidfont.ttfParser = &ttf
 
-	// 2-byte character codes. -> runes
+	// 2-byte character codes -> runes
 	runes := []uint16{}
 	for r := range ttf.Chars {
 		runes = append(runes, r)
@@ -254,7 +392,7 @@ func NewCompositePdfFontFromTTFFile(filePath string) (*PdfFont, error) {
 	k := 1000.0 / float64(ttf.UnitsPerEm)
 
 	if len(ttf.Widths) <= 0 {
-		return nil, errors.New("Missing required attribute (Widths)")
+		return nil, errors.New("ERROR: Missing required attribute (Widths)")
 	}
 
 	missingWidth := k * float64(ttf.Widths[0])
@@ -321,13 +459,13 @@ func NewCompositePdfFontFromTTFFile(filePath string) (*PdfFont, error) {
 	// Embed the TrueType font program.
 	ttfBytes, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		common.Log.Debug("Unable to read file contents: %v", err)
+		common.Log.Debug("ERROR: :Unable to read file contents: %v", err)
 		return nil, err
 	}
 
 	stream, err := MakeStream(ttfBytes, NewFlateEncoder())
 	if err != nil {
-		common.Log.Debug("Unable to make stream: %v", err)
+		common.Log.Debug("ERROR: Unable to make stream: %v", err)
 		return nil, err
 	}
 	stream.PdfObjectDictionary.Set("Length1", MakeInteger(int64(len(ttfBytes))))
