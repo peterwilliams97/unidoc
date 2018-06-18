@@ -49,9 +49,10 @@ type PdfFont struct {
 	fontDescriptor *PdfFontDescriptor
 }
 
+// toFont returns a PdfObjectDictionary for `font`.
+// It can set `font`'s SubType to `subtype` if font doesn't have a subtype
 func (font PdfFont) toDict(subtype string) *PdfObjectDictionary {
-	d := MakeDict()
-	d.Set("Type", MakeName("Font"))
+
 	if subtype != "" && font.subtype != "" {
 		common.Log.Debug("ERROR: toDict. Overriding subtype to %#q %s", subtype, font)
 	} else if subtype == "" && font.subtype == "" {
@@ -59,6 +60,9 @@ func (font PdfFont) toDict(subtype string) *PdfObjectDictionary {
 	} else if font.subtype == "" {
 		font.subtype = subtype
 	}
+
+	d := MakeDict()
+	d.Set("Type", MakeName("Font"))
 	d.Set("Subtype", MakeName(font.subtype))
 	if font.BaseFont != nil {
 		d.Set("BaseFont", font.BaseFont)
@@ -108,7 +112,7 @@ func (font PdfFont) GetCMap() *cmap.CMap {
 	return nil
 }
 
-// actualFont returns the Font in font.contex
+// actualFont returns the Font in font.context
 func (font PdfFont) actualFont() fonts.Font {
 	if font.context == nil {
 		common.Log.Debug("actualFont. ERROR: context is nil. font=%s", font)

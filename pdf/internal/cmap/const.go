@@ -8,13 +8,15 @@ package cmap
 import "regexp"
 
 const (
-	cisSystemInfo       = "/CIDSystemInfo"
+	cisSystemInfo       = "CIDSystemInfo"
 	begincodespacerange = "begincodespacerange"
 	endcodespacerange   = "endcodespacerange"
 	beginbfchar         = "beginbfchar"
 	endbfchar           = "endbfchar"
 	beginbfrange        = "beginbfrange"
 	endbfrange          = "endbfrange"
+	begincidrange       = "begincidrange"
+	endcidrange         = "endcidrange"
 
 	cmapname = "CMapName"
 	cmaptype = "CMapType"

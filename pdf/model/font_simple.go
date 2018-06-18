@@ -118,7 +118,7 @@ func newSimpleFontFromPdfObject(obj PdfObject, skeleton *PdfFont) (*pdfFontSimpl
 
 	intVal, ok := TraceToDirectObject(obj).(*PdfObjectInteger)
 	if !ok {
-		common.Log.Debug("Invalid FirstChar type (%T)", obj)
+		common.Log.Debug("ERROR: Invalid FirstChar type (%T)", obj)
 		return nil, ErrTypeError
 	}
 	font.firstChar = int(*intVal)
@@ -134,7 +134,7 @@ func newSimpleFontFromPdfObject(obj PdfObject, skeleton *PdfFont) (*pdfFontSimpl
 	font.LastChar = obj
 	intVal, ok = TraceToDirectObject(obj).(*PdfObjectInteger)
 	if !ok {
-		common.Log.Debug("Invalid LastChar type (%T)", obj)
+		common.Log.Debug("ERROR: Invalid LastChar type (%T)", obj)
 		return nil, ErrTypeError
 	}
 	font.lastChar = int(*intVal)
@@ -142,20 +142,20 @@ func newSimpleFontFromPdfObject(obj PdfObject, skeleton *PdfFont) (*pdfFontSimpl
 	font.charWidths = []float64{}
 	obj = d.Get("Widths")
 	if obj == nil {
-		common.Log.Debug("Widths missing from font")
+		common.Log.Debug("ERROR: Widths missing from font")
 		return nil, ErrRequiredAttributeMissing
 	}
 	font.Widths = obj
 
 	arr, ok := TraceToDirectObject(obj).(*PdfObjectArray)
 	if !ok {
-		common.Log.Debug("Widths attribute != array (%T)", arr)
+		common.Log.Debug("ERROR: Widths attribute != array (%T)", arr)
 		return nil, ErrTypeError
 	}
 
 	widths, err := arr.ToFloat64Array()
 	if err != nil {
-		common.Log.Debug("Error converting widths to array")
+		common.Log.Debug("ERROR: converting widths to array")
 		return nil, err
 	}
 
@@ -170,7 +170,7 @@ func newSimpleFontFromPdfObject(obj PdfObject, skeleton *PdfFont) (*pdfFontSimpl
 
 	baseEncoder, differences, err := getFontEncoding(TraceToDirectObject(font.Encoding))
 	if err != nil {
-		common.Log.Debug("Error: BaseFont=%q Subtype=%q Encoding=%s (%T) err=%v", skeleton.basefont,
+		common.Log.Debug("ERROR: BaseFont=%q Subtype=%q Encoding=%s (%T) err=%v", skeleton.basefont,
 			skeleton.subtype, font.Encoding, font.Encoding, err)
 		return nil, err
 	}
@@ -269,7 +269,7 @@ func (this *pdfFontSimple) ToPdfObject() PdfObject {
 func NewPdfFontFromTTFFile(filePath string) (*PdfFont, error) {
 	ttf, err := fonts.TtfParse(filePath)
 	if err != nil {
-		common.Log.Debug("Error loading ttf font: %v", err)
+		common.Log.Debug("ERROR: loading ttf font: %v", err)
 		return nil, err
 	}
 
@@ -290,7 +290,7 @@ func NewPdfFontFromTTFFile(filePath string) (*PdfFont, error) {
 
 	k := 1000.0 / float64(ttf.UnitsPerEm)
 	if len(ttf.Widths) <= 0 {
-		return nil, errors.New("Missing required attribute (Widths)")
+		return nil, errors.New("ERROR: Missing required attribute (Widths)")
 	}
 
 	missingWidth := k * float64(ttf.Widths[0])
@@ -319,7 +319,7 @@ func NewPdfFontFromTTFFile(filePath string) (*PdfFont, error) {
 	truefont.Widths = &PdfIndirectObject{PdfObject: MakeArrayFromFloats(vals)}
 
 	if len(vals) < (255 - 32 + 1) {
-		common.Log.Debug("Invalid length of widths, %d < %d", len(vals), 255-32+1)
+		common.Log.Debug("ERROR: Invalid length of widths, %d < %d", len(vals), 255-32+1)
 		return nil, errors.New("Range check error")
 	}
 
