@@ -83,7 +83,13 @@ func (font PdfFont) String() string {
 
 func (font PdfFont) CharcodeBytesToUnicode(codes []byte) string {
 	if codemap := font.GetCMap(); codemap != nil {
-		return codemap.CharcodeBytesToUnicode(codes)
+		if codemap.HasCodemap() {
+			return codemap.CharcodeBytesToUnicode(codes)
+		}
+	}
+	switch t := font.context.(type) {
+	case *pdfFontType0:
+		return t.CharcodeBytesToUnicode(codes)
 	}
 	if encoder := font.Encoder(); encoder != nil {
 		runes := []rune{}
@@ -104,6 +110,8 @@ func (font PdfFont) CharcodeBytesToUnicode(codes []byte) string {
 func (font PdfFont) GetCMap() *cmap.CMap {
 	switch t := font.context.(type) {
 	case *pdfFontSimple:
+		return t.CMap
+	case *pdfFontType0:
 		return t.CMap
 		// default:
 		// 	// common.Log.Debug("GetCMap. Not implemented for font type=%#T", font.context)

@@ -8,6 +8,7 @@ import (
 
 	"github.com/unidoc/unidoc/common"
 	. "github.com/unidoc/unidoc/pdf/core"
+	"github.com/unidoc/unidoc/pdf/internal/cmap"
 	"github.com/unidoc/unidoc/pdf/model/fonts"
 	"github.com/unidoc/unidoc/pdf/model/textencoding"
 )
@@ -81,7 +82,6 @@ import (
        It shall be used only as a descendant of a Type 0 font.
    The CMap in the Type 0 font shall be what defines the encoding that maps character codes to CIDs
    in  the CIDFont.
-
 
    9.7.4.2 Glyph Selection in CIDFonts (page 270)
 
@@ -200,9 +200,46 @@ type pdfFontType0 struct {
 	skeleton  *PdfFont
 
 	encoder        textencoding.TextEncoder
+	CMap           *cmap.CMap
 	Encoding       PdfObject
 	DescendantFont *PdfFont // Can be either CIDFontType0 or CIDFontType2 font.
 	ToUnicode      PdfObject
+}
+
+func (font pdfFontType0) String() string {
+	return fmt.Sprintf("%s\n\t%s\n\t%s", font.skeleton.String(), font.CMap.String(),
+		font.DescendantFont.String())
+}
+
+func (font pdfFontType0) CharcodeBytesToUnicode(src []byte) string {
+	switch t := font.DescendantFont.context.(type) {
+	case *pdfCIDFontType0:
+		cmap := font.CMap
+		codes := cmap.ReadCodes(src)
+		cidToRune := t.cidToRune
+		if len(cidToRune) == 0 {
+			fmt.Printf("*** cmap=%s\n", cmap.String())
+			// panic("GGGG")
+		}
+		runes := []rune{}
+		if len(cidToRune) > 0 {
+			for _, code := range codes {
+				cid := cmap.ToCID(code)
+				r := cidToRune[cid]
+				runes = append(runes, r)
+			}
+		} else {
+			for _, code := range codes {
+				cid := cmap.ToCID(code)
+				r := rune(cid)
+				runes = append(runes, r)
+			}
+		}
+		return string(runes)
+	}
+	panic("not implemented")
+	return fmt.Sprintf("%s\n\t%s\n\t%s", font.skeleton.String(), font.CMap.String(),
+		font.DescendantFont.String())
 }
 
 // GetGlyphCharMetrics returns the character metrics for the specified glyph.  A bool flag is
@@ -269,42 +306,40 @@ func newPdfFontType0FromPdfObject(obj PdfObject, skeleton *PdfFont) (*pdfFontTyp
 		return nil, err
 	}
 
+	var cm *cmap.CMap
+	switch t := TraceToDirectObject(d.Get("Encoding")).(type) {
+	case *PdfObjectName:
+		name := string(*t)
+		cm, err = cmap.GetPredefinedCmap(name)
+		if err != nil {
+			common.Log.Debug("ERROR: There is no prefedined CMap %#v. font=%s", name, skeleton)
+			return nil, err
+		}
+	default:
+		common.Log.Debug("Incompatibility ERROR: Type 0 font encoding not a name (%T) font=%s",
+			obj, skeleton)
+		panic(ErrTypeError)
+		return nil, ErrTypeError
+	}
+
 	font := &pdfFontType0{
+		skeleton:       skeleton,
 		DescendantFont: df,
+		CMap:           cm,
 		ToUnicode:      TraceToDirectObject(d.Get("ToUnicode")),
 	}
+	fmt.Printf("font=%s\n", font)
+	// panic("3333")
 
 	return font, nil
 }
-
-// // CIDSystemInfo=Dict("Registry": Adobe, "Ordering": Korea1, "Supplement": 0, )
-// // !@#$ This is in CMap
-// type CIDSystemInfo struct {
-// 	Registry   string
-// 	Ordering   string
-// 	Supplement int
-// }
-
-// func newCIDSystemInfo(info PdfObject) CIDSystemInfo {
-// 	info = TraceToDirectObject(info)
-// 	d := *info.(*PdfObjectDictionary)
-// 	registry, _ := GetString(d.Get("Registry"))
-// 	ordering, _ := GetString(d.Get("Ordering"))
-// 	supplement, _ := GetNumberAsInt(d.Get("Supplement"))
-// 	return CIDSystemInfo{
-// 		Registry:   registry,
-// 		Ordering:   ordering,
-// 		Supplement: supplement,
-// 	}
-// }
 
 // pdfCIDFontType0 represents a CIDFont Type0 font dictionary.
 type pdfCIDFontType0 struct {
 	container *PdfIndirectObject
 	skeleton  *PdfFont // Elements common to all font types. !@#$% Possibly doesn't belong here.
 
-	encoder   textencoding.TextEncoder
-	ttfParser *fonts.TtfType
+	encoder textencoding.TextEncoder
 
 	// Table 117 – Entries in a CIDFont dictionary (page 269)
 	CIDSystemInfo  PdfObject // (Required) Dictionary that defines the character collection of the CIDFont. See Table 116.
@@ -312,14 +347,16 @@ type pdfCIDFontType0 struct {
 	DW             PdfObject // (Optional) Default width for glyphs in the CIDFont Default value: 1000 (defined in user units)
 	W              PdfObject // (Optional) Widths for the glyphs in the CIDFont. Default value: none (the DW value shall be used for all glyphs).
 	// DW2, W2: (Optional; applies only to CIDFonts used for vertical writing)
-	DW2         PdfObject // An array of two numbers specifying the default metrics for vertical writing. Default value: [880 −1000].
-	W2          PdfObject // A description of the metrics for vertical writing for the glyphs in the CIDFont. Default value: none (the DW2 value shall be used for all glyphs).
-	CIDToGIDMap PdfObject // (Optional; Type 2 CIDFonts only) A specification of the mapping from CIDs to glyph indices.
+	DW2 PdfObject // An array of two numbers specifying the default metrics for vertical writing. Default value: [880 −1000].
+	W2  PdfObject // A description of the metrics for vertical writing for the glyphs in the CIDFont. Default value: none (the DW2 value shall be used for all glyphs).
 
-	// Mapping between unicode runes to widths.
+	// Mapping from CIDs to unicode runes
+	cidToRune map[int]rune
+
+	// Mapping from unicode runes to widths.
 	runeToWidthMap map[uint16]int
 
-	// Also mapping between GIDs (glyph index) and width.
+	// Also mapping from GIDs (glyph index) to widths.
 	gidToWidthMap map[uint16]int
 }
 
@@ -337,27 +374,11 @@ func (font pdfCIDFontType0) SetEncoder(encoder textencoding.TextEncoder) {
 // returned to indicate whether or not the entry was found in the glyph to charcode mapping.
 func (font pdfCIDFontType0) GetGlyphCharMetrics(glyph string) (fonts.CharMetrics, bool) {
 	metrics := fonts.CharMetrics{}
-
-	enc := textencoding.NewTrueTypeFontEncoder(font.ttfParser.Chars)
-
-	// Convert the glyph to character code.
-	r, found := enc.GlyphToRune(glyph)
-	if !found {
-		common.Log.Debug("Unable to convert glyph %s to charcode (identity). font=%s", glyph, font)
-		return metrics, false
-	}
-
-	w, found := font.runeToWidthMap[uint16(r)]
-	if !found {
-		return metrics, false
-	}
-	metrics.GlyphName = glyph
-	metrics.Wx = float64(w)
-
+	// Not implemented yet. !@#$
 	return metrics, true
 }
 
-// ToPdfObject converts the pdfCIDFontType2 to a PDF representation.
+// ToPdfObject converts the pdfCIDFontType0 to a PDF representation.
 func (font *pdfCIDFontType0) ToPdfObject() PdfObject {
 	if font.container == nil {
 		font.container = &PdfIndirectObject{}
@@ -380,9 +401,6 @@ func (font *pdfCIDFontType0) ToPdfObject() PdfObject {
 	if font.W2 != nil {
 		d.Set("W2", font.W2)
 	}
-	if font.CIDToGIDMap != nil {
-		d.Set("CIDToGIDMap", font.CIDToGIDMap)
-	}
 
 	return font.container
 }
@@ -401,17 +419,27 @@ func newPdfCIDFontType0FromPdfObject(obj PdfObject, skeleton *PdfFont) (*pdfCIDF
 	// CIDSystemInfo.
 	obj = TraceToDirectObject(d.Get("CIDSystemInfo"))
 	if obj == nil {
-		common.Log.Debug("CIDSystemInfo (Required) missing")
+		common.Log.Debug("CIDSystemInfo (Required) missing. font=%s", skeleton)
 		return nil, ErrRequiredAttributeMissing
 	}
 	font.CIDSystemInfo = obj
+	cidSystemInfo, err := cmap.NewCIDSystemInfo(obj)
+	if err != nil {
+		return nil, err
+	}
+	cidToRune, ok := cmap.GetPredefinedCidToRune(cidSystemInfo)
+	if !ok {
+		common.Log.Debug("Unkown CIDSystemInfo %s. font=%s", cidSystemInfo, skeleton)
+		return nil, ErrRequiredAttributeMissing
+	}
+	font.cidToRune = cidToRune
 
 	// Optional attributes.
 	font.DW = TraceToDirectObject(d.Get("DW"))
 	font.W = TraceToDirectObject(d.Get("W"))
 	font.DW2 = TraceToDirectObject(d.Get("DW2"))
 	font.W2 = TraceToDirectObject(d.Get("W2"))
-	font.CIDToGIDMap = d.Get("CIDToGIDMap")
+	// font.CIDToGIDMap = d.Get("CIDToGIDMap")
 
 	// d=[BaseFont CIDSystemInfo DW FontDescriptor Subtype Type W]
 	fmt.Println("############################&&$$$$$$$$$$$$$$$$$$$$$$")
@@ -421,7 +449,7 @@ func newPdfCIDFontType0FromPdfObject(obj PdfObject, skeleton *PdfFont) (*pdfCIDF
 	fmt.Printf("   W=%s\n", font.W)
 	fmt.Printf("  DW=%s\n", font.DW)
 	fmt.Printf("skeleton=%s\n", skeleton)
-	fmt.Printf("font=%#v\n", font)
+	// fmt.Printf("font=%#v\n", font)
 
 	return font, nil
 }

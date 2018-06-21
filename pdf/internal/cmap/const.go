@@ -17,6 +17,7 @@ const (
 	endbfrange          = "endbfrange"
 	begincidrange       = "begincidrange"
 	endcidrange         = "endcidrange"
+	usecmap             = "usecmap"
 
 	cmapname = "CMapName"
 	cmaptype = "CMapType"

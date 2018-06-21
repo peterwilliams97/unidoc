@@ -7,12 +7,12 @@ package cmap
 
 import "bytes"
 
-func hexToUint64(shex cmapHexString) uint64 {
-	val := uint64(0)
+func hexToCharCode(shex cmapHexString) CharCode {
+	val := CharCode(0)
 
 	for _, v := range shex.b {
 		val <<= 8
-		val |= uint64(v)
+		val |= CharCode(v)
 	}
 
 	return val

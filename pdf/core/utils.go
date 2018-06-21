@@ -198,6 +198,14 @@ func GetName(obj PdfObject) (string, error) {
 	return "", err
 }
 
+func GetInteger(obj PdfObject) (int, error) {
+	if i, ok := obj.(*PdfObjectInteger); ok {
+		return int(*i), nil
+	}
+	err := errors.New("Not an integer")
+	return 0, err
+}
+
 func GetArray(obj PdfObject) ([]PdfObject, error) {
 	if s, ok := obj.(*PdfObjectArray); ok {
 		return []PdfObject(*s), nil

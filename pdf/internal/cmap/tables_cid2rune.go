@@ -12,68 +12,12 @@ package cmap
 // 3: Adobe-GB1-5      29883 codes
 // 4: Adobe-KR-9       21145 codes
 
-var cmapToRunemap = map[string]string{
-	"GB-EUC-H":         "Adobe-GB1",
-	"GB-EUC-V":         "Adobe-GB1",
-	"GBpc-EUC-H":       "Adobe-GB1",
-	"GBpc-EUC-V":       "Adobe-GB1",
-	"GBK-EUC-H":        "Adobe-GB1",
-	"GBK-EUC-V":        "Adobe-GB1",
-	"GBK2K-H":          "Adobe-GB1",
-	"GBK2K-V":          "Adobe-GB1",
-	"UniGB-UCS2-H":     "Adobe-GB1",
-	"UniGB-UCS2-V":     "Adobe-GB1",
-	"UniGB-UTF16-H":    "Adobe-GB1",
-	"UniGB-UTF16-V":    "Adobe-GB1",
-	"B5pc-H":           "Adobe-CNS1",
-	"B5pc-V":           "Adobe-CNS1",
-	"HKscs-B5-H":       "Adobe-CNS1",
-	"HKscs-B5-V":       "Adobe-CNS1",
-	"ETen-B5-H":        "Adobe-CNS1",
-	"ETen-B5-V":        "Adobe-CNS1",
-	"ETenms-B5-H":      "Adobe-CNS1",
-	"ETenms-B5-V":      "Adobe-CNS1",
-	"CNS-EUC-H":        "Adobe-CNS1",
-	"CNS-EUC-V":        "Adobe-CNS1",
-	"UniCNS-UCS2-H":    "Adobe-CNS1",
-	"UniCNS-UCS2-V":    "Adobe-CNS1",
-	"UniCNS-UTF16-H":   "Adobe-CNS1",
-	"UniCNS-UTF16-V":   "Adobe-CNS1",
-	"83pv-RKSJ-H":      "Adobe-Japan1",
-	"90ms-RKSJ-H":      "Adobe-Japan1",
-	"90ms-RKSJ-V":      "Adobe-Japan1",
-	"90msp-RKSJ-H":     "Adobe-Japan1",
-	"90msp-RKSJ-V":     "Adobe-Japan1",
-	"90pv-RKSJ-H":      "Adobe-Japan1",
-	"Add-RKSJ-H":       "Adobe-Japan1",
-	"Add-RKSJ-V":       "Adobe-Japan1",
-	"EUC-H":            "Adobe-Japan1",
-	"EUC-V":            "Adobe-Japan1",
-	"Ext-RKSJ-H":       "Adobe-Japan1",
-	"Ext-RKSJ-V":       "Adobe-Japan1",
-	"H":                "Adobe-Japan1",
-	"V":                "Adobe-Japan1",
-	"UniJIS-UCS2-H":    "Adobe-Japan1",
-	"UniJIS-UCS2-V":    "Adobe-Japan1",
-	"UniJIS-UCS2-HW-H": "Adobe-Japan1",
-	"UniJIS-UCS2-HW-V": "Adobe-Japan1",
-	"UniJIS-UTF16-H":   "Adobe-Japan1",
-	"UniJIS-UTF16-V":   "Adobe-Japan1",
-	"KSC-EUC-H":        "Adobe-Korea1",
-	"KSC-EUC-V":        "Adobe-Korea1",
-	"KSCms-UHC-H":      "Adobe-Korea1",
-	"KSCms-UHC-V":      "Adobe-Korea1",
-	"KSCms-UHC-HW-H":   "Adobe-Korea1",
-	"KSCms-UHC-HW-V":   "Adobe-Korea1",
-	"KSCpc-EUC-H":      "Adobe-Korea1",
-	"UniKS-UCS2-H":     "Adobe-Korea1",
-	"UniKS-UCS2-V":     "Adobe-Korea1",
-	"UniKS-UTF16-H":    "Adobe-Korea1",
-	"UniKS-UTF16-V":    "Adobe-Korea1",
-}
+// XXX: TODO: We could include the Adobe files and load them on demand. This would make our Go
+// binary smaller.   Gus. Which do you prefer?
+// If we built these tables on demand then we could add a cache so they loaded only once.
 
-var cid2Rune = map[string]map[int]rune{
-	"Adobe-CNS1": map[int]rune{ //   18681 entries, max cid=0x4aea, max rune=0x2fa1b
+var cid2Rune = map[string]map[CID]rune{
+	"Adobe-CNS1": map[CID]rune{ //   18681 entries, max cid=0x4aea, max rune=0x2fa1b
 		0x0001: '\U000000a0', //
 		0x0002: '\U00000021', //  !
 		0x0003: '\U00000022', //  "
@@ -18756,7 +18700,7 @@ var cid2Rune = map[string]map[int]rune{
 		0x4ae9: '\U000095b2', //  閲
 		0x4aea: '\U00009c47', //  鱇
 	},
-	"Adobe-Japan1": map[int]rune{ // 15577 entries, max cid=0x5a11, max rune=0x2f9f4
+	"Adobe-Japan1": map[CID]rune{ // 15577 entries, max cid=0x5a11, max rune=0x2f9f4
 		0x0001: '\U000000a0', //
 		0x0002: '\U00000021', //  !
 		0x0003: '\U00000022', //  "
@@ -34335,7 +34279,7 @@ var cid2Rune = map[string]map[int]rune{
 		0x5a10: '\U00009fa1', //  龡
 		0x5a11: '\U00009fa3', //  龣
 	},
-	"Adobe-Korea1": map[int]rune{ // 17059 entries, max cid=0x46ea, max rune= 0xffe6
+	"Adobe-Korea1": map[CID]rune{ // 17059 entries, max cid=0x46ea, max rune= 0xffe6
 		0x0001: '\U000000a0', //
 		0x0002: '\U00000021', //  !
 		0x0003: '\U00000022', //  "
@@ -51396,7 +51340,7 @@ var cid2Rune = map[string]map[int]rune{
 		0x46e9: '\U0000d7a2', //  힢
 		0x46ea: '\U0000d7a3', //  힣
 	},
-	"Adobe-GB1": map[int]rune{ //    29883 entries, max cid=0x764b, max rune=0x241fe
+	"Adobe-GB1": map[CID]rune{ //    29883 entries, max cid=0x764b, max rune=0x241fe
 		0x0001: '\U000000a0', //
 		0x0002: '\U00000021', //  !
 		0x0003: '\U00000022', //  "
@@ -81281,7 +81225,7 @@ var cid2Rune = map[string]map[int]rune{
 		0x764a: '\U0000a4c5', //  ꓅
 		0x764b: '\U0000a4c6', //  ꓆
 	},
-	"Adobe-KR": map[int]rune{ //     21145 entries, max cid=0x5942, max rune=0x30726
+	"Adobe-KR": map[CID]rune{ //     21145 entries, max cid=0x5942, max rune=0x30726
 		0x0001: '\U000000a0', //
 		0x0002: '\U00000021', //  !
 		0x0003: '\U00000022', //  "
