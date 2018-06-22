@@ -9,6 +9,8 @@ import "regexp"
 
 const (
 	cisSystemInfo       = "CIDSystemInfo"
+	begincmap           = "begincmap"
+	endcmap             = "endcmap"
 	begincodespacerange = "begincodespacerange"
 	endcodespacerange   = "endcodespacerange"
 	beginbfchar         = "beginbfchar"

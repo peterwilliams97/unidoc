@@ -44,13 +44,17 @@ type PdfFont struct {
 	subtype  string
 	basefont string
 
-	BaseFont       PdfObject
-	Subtype        PdfObject
+	BaseFont  PdfObject
+	Subtype   PdfObject
+	ToUnicode PdfObject
+
+	UCMap          *cmap.CMap
 	fontDescriptor *PdfFontDescriptor
 }
 
 // toFont returns a PdfObjectDictionary for `font`.
 // It can set `font`'s SubType to `subtype` if font doesn't have a subtype
+// !@#$ For writing out font skeleton
 func (font PdfFont) toDict(subtype string) *PdfObjectDictionary {
 
 	if subtype != "" && font.subtype != "" {
@@ -70,6 +74,9 @@ func (font PdfFont) toDict(subtype string) *PdfObjectDictionary {
 	if font.fontDescriptor != nil {
 		d.Set("FontDescriptor", font.fontDescriptor.ToPdfObject())
 	}
+	if font.ToUnicode != nil {
+		d.Set("ToUnicode", font.ToUnicode)
+	}
 	return d
 }
 
@@ -82,11 +89,25 @@ func (font PdfFont) String() string {
 }
 
 func (font PdfFont) CharcodeBytesToUnicode(codes []byte) string {
-	if codemap := font.GetCMap(); codemap != nil {
-		if codemap.HasCodemap() {
-			return codemap.CharcodeBytesToUnicode(codes)
-		}
+	if font.UCMap != nil {
+		// if _, ok := fonts.SimpleFontTypes[font.subtype]; ok {
+		// 	codes2 := make([]byte, len(codes)*2)
+		// 	// fmt.Printf("@@@ codes=%d codes2=%d\n", len(codes), len(codes2))
+		// 	for i, c := range codes {
+		// 		// fmt.Printf("@## i=%d i<<2=%d c=%c\n", i, i<<2, c)
+		// 		codes2[i<<1] = c
+		// 	}
+		// 	codes = codes2
+		// }
+
+		return font.UCMap.CharcodeBytesToUnicode(codes, true)
 	}
+	// if codemap := font.GetCMap(); codemap != nil {
+	// 	if codemap.HasCodemap() {
+	// 		fmt.Printf("CharcodeBytesToUnicode. font=%s\n", font)
+	// 		return codemap.CharcodeBytesToUnicode(codes)
+	// 	}
+	// }
 	switch t := font.context.(type) {
 	case *pdfFontType0:
 		return t.CharcodeBytesToUnicode(codes)
@@ -98,6 +119,7 @@ func (font PdfFont) CharcodeBytesToUnicode(codes []byte) string {
 			if !ok {
 				common.Log.Debug("CharcodeBytesToUnicode: No rune. c=0x%04x font=%s", c, font)
 				r = '?'
+				// panic("??") !@#$
 			}
 			runes = append(runes, r)
 		}
@@ -109,8 +131,6 @@ func (font PdfFont) CharcodeBytesToUnicode(codes []byte) string {
 
 func (font PdfFont) GetCMap() *cmap.CMap {
 	switch t := font.context.(type) {
-	case *pdfFontSimple:
-		return t.CMap
 	case *pdfFontType0:
 		return t.CMap
 		// default:
@@ -119,6 +139,18 @@ func (font PdfFont) GetCMap() *cmap.CMap {
 	}
 	return nil
 }
+
+// func (font PdfFont) GetUCMap() *cmap.CMap {
+// 	switch t := font.context.(type) {
+// 	case *pdfFontSimple:
+// 		// fmt.Printf("$$$$ ", ...)
+// 		return t.UCMap
+// 		// default:
+// 		//  // common.Log.Debug("GetCMap. Not implemented for font type=%#T", font.context)
+// 		//  // XXX: Should we return a default encoding?
+// 	}
+// 	return nil
+// }
 
 // actualFont returns the Font in font.context
 func (font PdfFont) actualFont() fonts.Font {
@@ -264,6 +296,17 @@ func newFontSkeletonFromPdfObject(fontObj PdfObject) (*PdfFont, error) {
 		}
 	}
 
+	font.ToUnicode = TraceToDirectObject(d.Get("ToUnicode"))
+
+	if font.ToUnicode != nil {
+		codemap, err := toUnicodeToCmap(font.ToUnicode)
+		if err != nil {
+			return nil, err
+		}
+		font.UCMap = codemap
+		fmt.Printf("### toUnicode: font=%s\n --> UCMap=%s\n", font, font.UCMap)
+	}
+
 	return font, nil
 }
 
@@ -335,6 +378,16 @@ func (font PdfFont) ToPdfObject() PdfObject {
 }
 
 // toUnicodeToCmap returns a CMap of `toUnicode` if it exists
+// 9.10.3 ToUnicode CMaps (page 29)
+// The CMap defined in the ToUnicode entry of the font dictionary shall follow the syntax for CMaps
+// This CMap differs from an ordinary one in these ways:
+// • The only pertinent entry in the CMap stream dictionary (see Table 120) is UseCMap, which may be
+//   used if the CMap is based on another ToUnicode CMap.
+// • The CMap file shall contain begincodespacerange and endcodespacerange operators that are
+//   consistent with the encoding that the font uses. In particular, for a simple font, the
+//   codespace shall be one byte long.
+// • It shall use the beginbfchar, endbfchar, beginbfrange, and endbfrange operators to define the
+//   mapping from character codes to Unicode character sequences expressed in UTF-16BE encoding
 func toUnicodeToCmap(toUnicode PdfObject) (*cmap.CMap, error) {
 	toUnicodeStream, ok := toUnicode.(*PdfObjectStream)
 	if !ok {

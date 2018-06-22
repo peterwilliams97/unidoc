@@ -236,9 +236,14 @@ func (font pdfFontType0) CharcodeBytesToUnicode(src []byte) string {
 			}
 		}
 		return string(runes)
+	default:
+		fmt.Printf("CharcodeBytesToUnicode: %T\n", font.DescendantFont.context)
+		fmt.Printf("t=%+v\n", t)
+		fmt.Printf("t=%s\n", t)
 	}
-	panic("not implemented")
-	return fmt.Sprintf("%s\n\t%s\n\t%s", font.skeleton.String(), font.CMap.String(),
+
+	return fmt.Sprintf("CharcodeBytesToUnicode not implemented: %s\n\t%s\n\t%s",
+		font.skeleton.String(), font.CMap.String(),
 		font.DescendantFont.String())
 }
 
@@ -351,7 +356,7 @@ type pdfCIDFontType0 struct {
 	W2  PdfObject // A description of the metrics for vertical writing for the glyphs in the CIDFont. Default value: none (the DW2 value shall be used for all glyphs).
 
 	// Mapping from CIDs to unicode runes
-	cidToRune map[int]rune
+	cidToRune map[cmap.CID]rune
 
 	// Mapping from unicode runes to widths.
 	runeToWidthMap map[uint16]int

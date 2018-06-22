@@ -261,7 +261,8 @@ func (p *cMapParser) parseString() (cmapString, error) {
 	return cmapString{buf.String()}, nil
 }
 
-// Starts with '<' ends with '>'.
+// parseHexString parses a PostScript hex string.
+// Hex strings start with '<' ends with '>'.
 // Currently not converting the hex codes to characters.
 func (p *cMapParser) parseHexString() (cmapHexString, error) {
 	p.reader.ReadByte()
@@ -275,7 +276,7 @@ func (p *cMapParser) parseHexString() (cmapHexString, error) {
 
 		bb, err := p.reader.Peek(1)
 		if err != nil {
-			return cmapHexString{numBytes: 0, b: []byte("")}, err
+			return cmapHexString{}, err
 		}
 
 		if bb[0] == '>' {
@@ -290,12 +291,13 @@ func (p *cMapParser) parseHexString() (cmapHexString, error) {
 	}
 
 	if buf.Len()%2 == 1 {
+		common.Log.Debug("parseHexString: appending '0' to %#q", buf.String())
+		panic("4444")
 		buf.WriteByte('0')
 	}
-	numBytes := buf.Len() / 2
 
 	hexb, _ := hex.DecodeString(buf.String())
-	return cmapHexString{numBytes: numBytes, b: hexb}, nil
+	return cmapHexString{b: hexb}, nil
 }
 
 // Starts with '[' ends with ']'.  Can contain any kinds of direct objects.

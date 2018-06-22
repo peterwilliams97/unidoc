@@ -6,7 +6,6 @@ import (
 
 	"github.com/unidoc/unidoc/common"
 	. "github.com/unidoc/unidoc/pdf/core"
-	"github.com/unidoc/unidoc/pdf/internal/cmap"
 	"github.com/unidoc/unidoc/pdf/model/fonts"
 	"github.com/unidoc/unidoc/pdf/model/textencoding"
 )
@@ -42,9 +41,6 @@ type pdfFontSimple struct {
 	LastChar  PdfObject
 	Widths    PdfObject
 	Encoding  PdfObject
-	ToUnicode PdfObject
-
-	CMap *cmap.CMap
 }
 
 // Encoder returns the font's text encoder.
@@ -166,7 +162,6 @@ func newSimpleFontFromPdfObject(obj PdfObject, skeleton *PdfFont) (*pdfFontSimpl
 	font.charWidths = widths
 
 	font.Encoding = TraceToDirectObject(d.Get("Encoding"))
-	font.ToUnicode = TraceToDirectObject(d.Get("ToUnicode"))
 
 	baseEncoder, differences, err := getFontEncoding(TraceToDirectObject(font.Encoding))
 	if err != nil {
@@ -180,13 +175,6 @@ func newSimpleFontFromPdfObject(obj PdfObject, skeleton *PdfFont) (*pdfFontSimpl
 	}
 	font.SetEncoder(encoder)
 
-	if font.ToUnicode != nil {
-		codemap, err := toUnicodeToCmap(font.ToUnicode)
-		if err != nil {
-			return nil, err
-		}
-		font.CMap = codemap
-	}
 	return font, nil
 }
 
@@ -255,9 +243,6 @@ func (this *pdfFontSimple) ToPdfObject() PdfObject {
 	}
 	if this.Encoding != nil {
 		d.Set("Encoding", this.Encoding)
-	}
-	if this.ToUnicode != nil {
-		d.Set("ToUnicode", this.ToUnicode)
 	}
 
 	return this.container
