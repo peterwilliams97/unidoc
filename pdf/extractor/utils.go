@@ -10,7 +10,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/common"
+	"github.com/unidoc/unidoc/common"
 	"github.com/unidoc/unidoc/common/license"
 	"github.com/unidoc/unidoc/pdf/contentstream"
 	. "github.com/unidoc/unidoc/pdf/core"

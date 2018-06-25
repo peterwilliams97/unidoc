@@ -190,6 +190,14 @@ func GetString(obj PdfObject) (string, error) {
 	return "", err
 }
 
+func GetStringBytes(obj PdfObject) ([]byte, error) {
+	if s, ok := obj.(*PdfObjectString); ok {
+		return []byte(*s), nil
+	}
+	err := errors.New("Not a string")
+	return []byte{}, err
+}
+
 func GetName(obj PdfObject) (string, error) {
 	if s, ok := obj.(*PdfObjectName); ok {
 		return string(*s), nil

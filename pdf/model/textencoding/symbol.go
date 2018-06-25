@@ -7,7 +7,7 @@ package textencoding
 
 import (
 	"github.com/unidoc/unidoc/common"
-	"github.com/unidoc/unidoc/pdf/core"
+	. "github.com/unidoc/unidoc/pdf/core"
 )
 
 // Encoding for Symbol font.
@@ -19,8 +19,7 @@ func NewSymbolEncoder() SymbolEncoder {
 	return encoder
 }
 
-// Convert a raw utf8 string (series of runes) to an encoded string (series of character codes) to
-// be used in PDF.
+// Encode converts the Go unicode string `raw` to a PDF encoded string.
 func (enc SymbolEncoder) Encode(raw string) string {
 	encoded := []byte{}
 	for _, rune := range raw {
@@ -35,7 +34,7 @@ func (enc SymbolEncoder) Encode(raw string) string {
 	return string(encoded)
 }
 
-// Conversion between character code and glyph name.
+// CharcodeToGlyph returns the glyph name for character code `code`.
 // The bool return flag is true if there was a match, and false otherwise.
 func (enc SymbolEncoder) CharcodeToGlyph(code uint16) (string, bool) {
 	glyph, has := symbolEncodingCharcodeToGlyphMap[code]
@@ -106,13 +105,13 @@ func (enc SymbolEncoder) GlyphToRune(glyph string) (rune, bool) {
 }
 
 // Convert to PDF Object.
-func (enc SymbolEncoder) ToPdfObject() core.PdfObject {
-	dict := core.MakeDict()
-	dict.Set("Type", core.MakeName("Encoding"))
+func (enc SymbolEncoder) ToPdfObject() PdfObject {
+	dict := MakeDict()
+	dict.Set("Type", MakeName("Encoding"))
 
 	// Returning an empty Encoding object with no differences. Indicates that we are using the
 	// font's built-in encoding.
-	return core.MakeIndirectObject(dict)
+	return MakeIndirectObject(dict)
 }
 
 // Charcode to Glyph map (Symbol encoding)

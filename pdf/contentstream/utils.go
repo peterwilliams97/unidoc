@@ -9,44 +9,44 @@ import (
 	"errors"
 
 	"github.com/unidoc/unidoc/common"
-	"github.com/unidoc/unidoc/pdf/core"
+	. "github.com/unidoc/unidoc/pdf/core"
 	"github.com/unidoc/unidoc/pdf/model"
 )
 
-func makeParamsFromFloats(vals []float64) []core.PdfObject {
-	params := []core.PdfObject{}
+func makeParamsFromFloats(vals []float64) []PdfObject {
+	params := []PdfObject{}
 	for _, val := range vals {
-		params = append(params, core.MakeFloat(val))
+		params = append(params, MakeFloat(val))
 	}
 	return params
 }
 
-func makeParamsFromNames(vals []core.PdfObjectName) []core.PdfObject {
-	params := []core.PdfObject{}
+func makeParamsFromNames(vals []PdfObjectName) []PdfObject {
+	params := []PdfObject{}
 	for _, val := range vals {
-		params = append(params, core.MakeName(string(val)))
+		params = append(params, MakeName(string(val)))
 	}
 	return params
 }
 
-func makeParamsFromStrings(vals []core.PdfObjectString) []core.PdfObject {
-	params := []core.PdfObject{}
+func makeParamsFromStrings(vals []PdfObjectString) []PdfObject {
+	params := []PdfObject{}
 	for _, val := range vals {
-		params = append(params, core.MakeString(string(val)))
+		params = append(params, MakeString(string(val)))
 	}
 	return params
 }
 
-func makeParamsFromInts(vals []int64) []core.PdfObject {
-	params := []core.PdfObject{}
+func makeParamsFromInts(vals []int64) []PdfObject {
+	params := []PdfObject{}
 	for _, val := range vals {
-		params = append(params, core.MakeInteger(val))
+		params = append(params, MakeInteger(val))
 	}
 	return params
 }
 
-func newIndexedColorspaceFromPdfObject(obj core.PdfObject) (model.PdfColorspace, error) {
-	arr, ok := obj.(*core.PdfObjectArray)
+func newIndexedColorspaceFromPdfObject(obj PdfObject) (model.PdfColorspace, error) {
+	arr, ok := obj.(*PdfObjectArray)
 	if !ok {
 		common.Log.Debug("Error: Invalid indexed cs not in array (%#v)", obj)
 		return nil, errors.New("Type check error")
@@ -58,7 +58,7 @@ func newIndexedColorspaceFromPdfObject(obj core.PdfObject) (model.PdfColorspace,
 	}
 
 	// Format is [/I base 255 bytes], where base = /G,/RGB,/CMYK
-	name, ok := (*arr)[0].(*core.PdfObjectName)
+	name, ok := (*arr)[0].(*PdfObjectName)
 	if !ok {
 		common.Log.Debug("Error: Invalid cs array first element not a name (array: %#v)", *arr)
 		return nil, errors.New("Type check error")
@@ -69,7 +69,7 @@ func newIndexedColorspaceFromPdfObject(obj core.PdfObject) (model.PdfColorspace,
 	}
 
 	// Check base
-	name, ok = (*arr)[1].(*core.PdfObjectName)
+	name, ok = (*arr)[1].(*PdfObjectName)
 	if !ok {
 		common.Log.Debug("Error: Invalid cs array 2nd element not a name (array: %#v)", *arr)
 		return nil, errors.New("Type check error")
@@ -89,7 +89,7 @@ func newIndexedColorspaceFromPdfObject(obj core.PdfObject) (model.PdfColorspace,
 	}
 
 	// Prepare to a format that can be loaded by model's newPdfColorspaceFromPdfObject.
-	csArr := core.MakeArray(core.MakeName("Indexed"), core.MakeName(basename), (*arr)[2], (*arr)[3])
+	csArr := MakeArray(MakeName("Indexed"), MakeName(basename), (*arr)[2], (*arr)[3])
 
 	return model.NewPdfColorspaceFromPdfObject(csArr)
 }

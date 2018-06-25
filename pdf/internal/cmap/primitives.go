@@ -30,7 +30,8 @@ type cmapString struct {
 
 // cmapHexString represents a PostScript hex string such as <FFFF>
 type cmapHexString struct {
-	b []byte
+	numBytes int // original number of bytes in the raw representation
+	b        []byte
 }
 
 type cmapArray struct {

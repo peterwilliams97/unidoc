@@ -1,22 +1,7 @@
 /*
  * This file is subject to the terms and conditions defined in
  * file 'LICENSE.md', which is part of this source code package.
-
-  createDefaultFont() throws IOException
-    {
-        COSDictionary dict = new COSDictionary();
-        dict.setItem(COSName.TYPE, COSName.FONT);
-        dict.setItem(COSName.SUBTYPE, COSName.TRUE_TYPE);
-        dict.setString(COSName.BASE_FONT, "Arial");
-        return createFont(dict);
-    }
-
-      // decode a character
-            int before = in.available();
-            int code = font.readCode(in);
-            int codeLength = before - in.available();
-            String unicode = font.toUnicode(code);
-*/
+ */
 
 package model
 
@@ -88,7 +73,8 @@ func (font PdfFont) String() string {
 	return fmt.Sprintf("%T %#q %#q %s", font.context, font.subtype, font.basefont, descriptor)
 }
 
-func (font PdfFont) CharcodeBytesToUnicode(codes []byte) string {
+// CharcodeBytesToUnicode converts PDF character codes `charcodes` to a Go unicode string.
+func (font PdfFont) CharcodeBytesToUnicode(charcodes []byte) string {
 	if font.UCMap != nil {
 		// if _, ok := fonts.SimpleFontTypes[font.subtype]; ok {
 		// 	codes2 := make([]byte, len(codes)*2)
@@ -100,7 +86,7 @@ func (font PdfFont) CharcodeBytesToUnicode(codes []byte) string {
 		// 	codes = codes2
 		// }
 
-		return font.UCMap.CharcodeBytesToUnicode(codes, true)
+		return font.UCMap.CharcodeBytesToUnicode(charcodes)
 	}
 	// if codemap := font.GetCMap(); codemap != nil {
 	// 	if codemap.HasCodemap() {
@@ -110,14 +96,14 @@ func (font PdfFont) CharcodeBytesToUnicode(codes []byte) string {
 	// }
 	switch t := font.context.(type) {
 	case *pdfFontType0:
-		return t.CharcodeBytesToUnicode(codes)
+		return t.CharcodeBytesToUnicode(charcodes)
 	}
 	if encoder := font.Encoder(); encoder != nil {
 		runes := []rune{}
-		for _, c := range codes {
-			r, ok := encoder.CharcodeToRune(uint16(c))
+		for _, code := range charcodes {
+			r, ok := encoder.CharcodeToRune(uint16(code))
 			if !ok {
-				common.Log.Debug("CharcodeBytesToUnicode: No rune. c=0x%04x font=%s", c, font)
+				common.Log.Debug("CharcodeBytesToUnicode: No rune. code=0x%04x font=%s", code, font)
 				r = '?'
 				// panic("??") !@#$
 			}
@@ -126,7 +112,7 @@ func (font PdfFont) CharcodeBytesToUnicode(codes []byte) string {
 		return string(runes)
 	}
 	common.Log.Debug("CharcodeBytesToUnicode. Couldn't convert. Returning input bytes. font=%s", font)
-	return string(codes)
+	return string(charcodes)
 }
 
 func (font PdfFont) GetCMap() *cmap.CMap {
@@ -140,27 +126,31 @@ func (font PdfFont) GetCMap() *cmap.CMap {
 	return nil
 }
 
-// func (font PdfFont) GetUCMap() *cmap.CMap {
-// 	switch t := font.context.(type) {
-// 	case *pdfFontSimple:
-// 		// fmt.Printf("$$$$ ", ...)
-// 		return t.UCMap
-// 		// default:
-// 		//  // common.Log.Debug("GetCMap. Not implemented for font type=%#T", font.context)
-// 		//  // XXX: Should we return a default encoding?
-// 	}
-// 	return nil
-// }
+func (font PdfFont) isCIDFont() bool {
+	if font.subtype == "" {
+		common.Log.Debug("ERROR: isCIDFont. context is nil. font=%s", font)
+		panic("lllll")
+	}
+	isCID := false
+	switch font.subtype {
+	case "Type0", "CIDFontType0", "CIDFontType2":
+		isCID = true
+	}
+	common.Log.Debug("isCIDFont: isCID=%t font=%s", isCID, font)
+	return isCID
+}
 
 // actualFont returns the Font in font.context
 func (font PdfFont) actualFont() fonts.Font {
 	if font.context == nil {
-		common.Log.Debug("actualFont. ERROR: context is nil. font=%s", font)
+		common.Log.Debug("ERROR: actualFont. context is nil. font=%s", font)
 	}
 	switch t := font.context.(type) {
 	case *pdfFontSimple:
 		return t
 	case *pdfFontType0:
+		return t
+	case *pdfCIDFontType0:
 		return t
 	case *pdfCIDFontType2:
 		return t
@@ -252,7 +242,7 @@ func newFontSkeletonFromPdfObject(fontObj PdfObject) (*PdfFont, error) {
 	d, ok := dictObj.(*PdfObjectDictionary)
 	if !ok {
 		common.Log.Debug("Font not given by a dictionary (%T)", fontObj)
-		return nil, ErrTypeError
+		return nil, ErrUnsupportedFont
 	}
 	font.dict = d
 
@@ -299,7 +289,7 @@ func newFontSkeletonFromPdfObject(fontObj PdfObject) (*PdfFont, error) {
 	font.ToUnicode = TraceToDirectObject(d.Get("ToUnicode"))
 
 	if font.ToUnicode != nil {
-		codemap, err := toUnicodeToCmap(font.ToUnicode)
+		codemap, err := toUnicodeToCmap(font.ToUnicode, font.isCIDFont())
 		if err != nil {
 			return nil, err
 		}
@@ -388,17 +378,20 @@ func (font PdfFont) ToPdfObject() PdfObject {
 //   codespace shall be one byte long.
 // • It shall use the beginbfchar, endbfchar, beginbfrange, and endbfrange operators to define the
 //   mapping from character codes to Unicode character sequences expressed in UTF-16BE encoding
-func toUnicodeToCmap(toUnicode PdfObject) (*cmap.CMap, error) {
+func toUnicodeToCmap(toUnicode PdfObject, isCID bool) (*cmap.CMap, error) {
 	toUnicodeStream, ok := toUnicode.(*PdfObjectStream)
 	if !ok {
 		common.Log.Debug("ERROR: toUnicodeToCmap: Not a stream (%T)", toUnicode)
 		return nil, errors.New("Invalid ToUnicode entry - not a stream")
 	}
-	decoded, err := DecodeStream(toUnicodeStream)
+	data, err := DecodeStream(toUnicodeStream)
 	if err != nil {
 		return nil, err
 	}
-	return cmap.LoadCmapFromData(decoded)
+	if isCID {
+		return cmap.LoadCmapFromDataCID(data)
+	}
+	return cmap.LoadCmapFromDataSimple(data)
 }
 
 // PdfFontDescriptor specifies metrics and other attributes of a font and can refer to a FontFile

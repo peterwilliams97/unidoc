@@ -14,7 +14,6 @@ import (
 	"github.com/unidoc/unidoc/common"
 	"github.com/unidoc/unidoc/pdf/contentstream" // Import all? !@#$
 	. "github.com/unidoc/unidoc/pdf/core"
-	"github.com/unidoc/unidoc/pdf/internal/cmap"
 	"github.com/unidoc/unidoc/pdf/model"
 	"github.com/unidoc/unidoc/pdf/model/fonts"
 )
@@ -41,8 +40,13 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 	cstreamParser := contentstream.NewContentStreamParser(e.contents)
 	operations, err := cstreamParser.Parse()
 	if err != nil {
+		common.Log.Debug("ExtractXYText: parse failed. err=%v", err)
 		return textList, err
 	}
+
+	// fmt.Println("========================= xxx =========================")
+	// fmt.Printf("%s\n", e.contents)
+	// fmt.Println("========================= ||| =========================")
 	processor := contentstream.NewContentStreamProcessor(*operations)
 
 	processor.AddHandler(contentstream.HandlerConditionEnumAllOperands, "",
@@ -75,6 +79,7 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 					return err
 				}
 				to.moveText(x, y)
+				to.renderText([]byte("\n"))
 			case "TD": // Move text location and set leading
 				if ok, err := checkOp(op, to, 2, true); !ok {
 					return err
@@ -88,11 +93,11 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 				if ok, err := checkOp(op, to, 1, true); !ok {
 					return err
 				}
-				text, err := GetString(op.Params[0])
+				charcodes, err := GetStringBytes(op.Params[0])
 				if err != nil {
 					return err
 				}
-				return to.showText(text)
+				return to.showText(charcodes)
 			case "TJ": // Show text with adjustable spacing
 				if ok, err := checkOp(op, to, 1, true); !ok {
 					return err
@@ -106,12 +111,12 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 				if ok, err := checkOp(op, to, 1, true); !ok {
 					return err
 				}
-				text, err := GetString(op.Params[0])
+				charcodes, err := GetStringBytes(op.Params[0])
 				if err != nil {
 					return err
 				}
 				to.nextLine()
-				return to.showText(text)
+				return to.showText(charcodes)
 			case `"`: // Set word and character spacing, move to next line, and show text
 				if ok, err := checkOp(op, to, 1, true); !ok {
 					return err
@@ -120,14 +125,14 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 				if err != nil {
 					return err
 				}
-				text, err := GetString(op.Params[2])
+				charcodes, err := GetStringBytes(op.Params[2])
 				if err != nil {
 					return err
 				}
 				to.setCharSpacing(x)
 				to.setWordSpacing(y)
 				to.nextLine()
-				return to.showText(text)
+				return to.showText(charcodes)
 			case "TL": // Set text leading
 				ok, y, err := checkOpFloat(op, to)
 				if !ok || err != nil {
@@ -152,7 +157,14 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 				if err != nil {
 					return err
 				}
-				return to.setFont(name, size)
+				err = to.setFont(name, size)
+				if err == model.ErrUnsupportedFont {
+					common.Log.Debug("Swallow error. err=%v", err)
+					err = nil
+				}
+				if err != nil {
+					return err
+				}
 			case "Tm": // Set text matrix
 				if ok, err := checkOp(op, to, 6, true); !ok {
 					return err
@@ -204,8 +216,12 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 		})
 
 	err = processor.Process(e.resources)
+	if err == model.ErrUnsupportedFont {
+		common.Log.Debug("Swallow error. err=%v", err)
+		err = nil
+	}
 	if err != nil {
-		common.Log.Error("Error processing: %v", err)
+		common.Log.Error("ERROR: Processing: err=%v", err)
 		return textList, err
 	}
 
@@ -254,8 +270,8 @@ func (to *TextObject) setTextMatrix(f []float64) {
 }
 
 // showText "Tj" Show a text string
-func (to *TextObject) showText(text string) error {
-	to.renderText(text)
+func (to *TextObject) showText(charcodes []byte) error {
+	to.renderText(charcodes)
 	return nil
 }
 
@@ -275,15 +291,15 @@ func (to *TextObject) showTextAdjusted(args []PdfObject) error {
 			}
 			to.Tm.Translate(dx, dy)
 		case *PdfObjectString:
-			text, err := GetString(o)
+			charcodes, err := GetStringBytes(o)
 			if err != nil {
 				common.Log.Debug("showTextAdjusted args=%+v err=%v", args, err)
 				return err
 			}
-			to.renderText(text)
+			to.renderText(charcodes)
 		default:
 			common.Log.Debug("showTextAdjusted. Unexpected type args=%+v", args)
-			return errors.New("typecheck")
+			return ErrTypeCheck
 		}
 	}
 	return nil
@@ -417,11 +433,26 @@ func newTextObject(e *Extractor, gs contentstream.GraphicsState, state *TextStat
 	}
 }
 
-// renderText emits `text` to the calling program
-// see 9.10.3, "ToUnicode CMaps"), whose value shall be a stream object containing a special
-func (to *TextObject) renderText(text string) {
-	// text0 := text
-	text = to.State.Tf.CharcodeBytesToUnicode([]byte(text))
+var lastFont = ""
+
+// renderText emits byte array `charcodes` to the calling program
+func (to *TextObject) renderText(charcodes []byte) {
+	text := ""
+	if to.State.Tf == nil {
+		common.Log.Debug("No font defined. charcodes=%#q", string(charcodes))
+		text = string(charcodes)
+	} else {
+		text = to.State.Tf.CharcodeBytesToUnicode(charcodes)
+	}
+
+	currentFont := ""
+	if to.State.Tf != nil {
+		currentFont = to.State.Tf.String()
+	}
+	if len(text) > 0 && currentFont != lastFont {
+		// fmt.Printf("renderText: Tf=%s->%s\n", lastFont, currentFont)
+		lastFont = currentFont
+	}
 	cp := to.getCp()
 	// fmt.Printf("renderText: %#q⇒%#q (%.1f,%.1f)\n", text0, text, cp.X, cp.Y)
 	to.Texts = append(to.Texts, XYText{Point: cp, Text: text})
@@ -557,31 +588,31 @@ func (tl *TextList) Transform(a, b, c, d, tx, ty float64) {
 	}
 }
 
-func (to *TextObject) getCodemap(name string) (codemap *cmap.CMap, err error) {
+// func (to *TextObject) getCodemap(name string) (codemap *cmap.CMap, err error) {
 
-	fontObj, err := to.getFontDict(name)
-	if err != nil {
-		return
-	}
-	fontDict := fontObj.(*PdfObjectDictionary)
-	toUnicode := fontDict.Get("ToUnicode")
-	toUnicode = TraceToDirectObject(toUnicode)
-	if toUnicode == nil {
-		return
-	}
-	toUnicodeStream, ok := toUnicode.(*PdfObjectStream)
-	if !ok {
-		err = errors.New("Invalid ToUnicode entry - not a stream")
-		return
-	}
-	var decoded []byte
-	decoded, err = DecodeStream(toUnicodeStream)
-	if err != nil {
-		return
-	}
-	codemap, err = cmap.LoadCmapFromData(decoded)
-	return
-}
+// 	fontObj, err := to.getFontDict(name)
+// 	if err != nil {
+// 		return
+// 	}
+// 	fontDict := fontObj.(*PdfObjectDictionary)
+// 	toUnicode := fontDict.Get("ToUnicode")
+// 	toUnicode = TraceToDirectObject(toUnicode)
+// 	if toUnicode == nil {
+// 		return
+// 	}
+// 	toUnicodeStream, ok := toUnicode.(*PdfObjectStream)
+// 	if !ok {
+// 		err = errors.New("Invalid ToUnicode entry - not a stream")
+// 		return
+// 	}
+// 	var decoded []byte
+// 	decoded, err = DecodeStream(toUnicodeStream)
+// 	if err != nil {
+// 		return
+// 	}
+// 	codemap, err = cmap.LoadCmapFromData(decoded)
+// 	return
+// }
 
 // getFont returns the font named `name` if it exists in the page's resources
 func (to *TextObject) getFont(name string) (*model.PdfFont, error) {
@@ -602,14 +633,14 @@ func (to *TextObject) getFont(name string) (*model.PdfFont, error) {
 func (to *TextObject) getFontDict(name string) (fontObj PdfObject, err error) {
 	resources := to.e.resources
 	if resources == nil {
-		common.Log.Debug("getFontDict: No resources")
+		common.Log.Debug("getFontDict. No resources. name=%#q", name)
 		return
 	}
 
 	fontObj, found := resources.GetFontByName(PdfObjectName(name))
 	if !found {
 		err = errors.New("Font not in resources")
-		common.Log.Debug("getFontDict: Font not found: name=%q err=%v", name, err)
+		common.Log.Debug("ERROR: getFontDict: Font not found: name=%#q err=%v", name, err)
 		return
 	}
 	fontObj = TraceToDirectObject(fontObj)

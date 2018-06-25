@@ -13,13 +13,14 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"../../cmap"
+	"github.com/unidoc/unidoc/common"
+	"github.com/unidoc/unidoc/pdf/internal/cmap"
 )
 
-func main() {
-	makeCMapTable()
-	// makeCidToCode()
-}
+/*
+ *  Download https://github.com/adobe-type-tools/cmap-resources to this directory to get the files
+ *  needed to build these tables
+ */
 
 var dirList = []string{
 	"Adobe-CNS1-7",
@@ -28,6 +29,15 @@ var dirList = []string{
 	"Adobe-Korea1-2",
 	"Adobe-GB1-5",
 	"Adobe-KR-9",
+}
+
+func init() {
+	common.SetLogger(common.NewConsoleLogger(common.LogLevelDebug))
+}
+
+func main() {
+	makeCMapTable()
+	// makeCidToCode()
 }
 
 func makeCMapTable() {
@@ -45,10 +55,15 @@ func makeCMapTable() {
 		}
 	}
 	fmt.Printf("// %d files\n", len(allFiles))
-	for _, fn := range allFiles {
-		cmap, err := cmap.LoadCmapFromFile(fn)
+
+	for i, fn := range allFiles {
+		// if fn != "Adobe-CNS1-7/CMap/UniCNS-UTF16-H" {
+		// 	continue
+		// }
+		fmt.Printf("// %d of %d files: %q\n", i, len(allFiles), fn)
+		cmap, err := cmap.LoadCmapFromFile(fn, 16)
 		if err != nil {
-			panic(err)
+			continue
 		}
 		cmapTable[path.Base(fn)] = cmap
 	}
@@ -62,7 +77,10 @@ func printNameDir(nameDir map[string]string, order []string, cmapTable map[strin
 	fmt.Printf("var nameToCIDMap = map[string]string { // %d entries\n", len(nameDir))
 	for _, name := range order {
 		dir := nameDir[name]
-		cmap := cmapTable[name]
+		cmap, ok := cmapTable[name]
+		if !ok {
+			continue
+		}
 		si := cmap.SystemInfo()
 		fmt.Printf("\t%#20q: %q, // %s:%s:%d \n", name, dir, si.Registry, si.Ordering, si.Supplement)
 	}
@@ -164,10 +182,29 @@ func sortNameDir(nameDir map[string]string) (sorted []string) {
 	return
 }
 
+func sortCodeToUnicode(m map[cmap.CharCode]string) (sorted []cmap.CharCode) {
+	for k := range m {
+		sorted = append(sorted, k)
+	}
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i] < sorted[j]
+	})
+	return
+}
+
+func sortCodespaces(m []cmap.Codespace) (sorted []cmap.Codespace) {
+	sorted = m
+	return
+}
+
 func printCMapTable(cmapTable map[string]*cmap.CMap, order []string) {
 	fmt.Printf("var cmapTable =  map[string]CMap{\n")
 	for _, fn := range order {
-		printCMap(fn, cmapTable[fn])
+		cm, ok := cmapTable[fn]
+		if !ok {
+			continue
+		}
+		printCMap(fn, cm)
 	}
 	fmt.Println("}")
 }
@@ -182,36 +219,66 @@ func printCMap(name string, cmap *cmap.CMap) {
 	si := cmap.SystemInfo()
 	fmt.Printf("\tsystemInfo: CIDSystemInfo{Registry: %q, Ordering: %q, Supplement: %d},\n",
 		si.Registry, si.Ordering, si.Supplement)
-	codespaces := cmap.Codespaces()
-	fmt.Printf("\tcodespaces: []Codespace{ // %d entries\n", len(codespaces))
-	for _, r := range codespaces {
-		fmt.Printf("\t\tCodespace{Low:0x%04x, High:0x%04x, NumBytes:%4d,},\n",
-			r.Low, r.High, r.NumBytes)
-	}
-	fmt.Println("\t},")
-	cidRanges := cmap.CidRanges()
-	fmt.Printf("\tcidRanges: []CIDRange{ // %d entries\n", len(cidRanges))
-	for _, r := range cidRanges {
-		fmt.Printf("\t\tCIDRange{From:0x%04x, To:0x%04x, Cid:%4d},\n", r.From, r.To, r.Cid)
-	}
-	fmt.Println("\t},")
-	fmt.Println("},")
-	// fmt.Printf("\tcodespaces []codespace{ //%d codespaces\n", len(cmap.codespaces))
-	// for i, cs := range cmap.codespaces {
-	// 	fmt.Printf("\t%#v, // %d of %d\n", cs, i+1, len(cmap.codespaces))
-	// }
-	// fmt.Println("},")
-	// // codeMap [4]map[uint64]string
-	// fmt.Println("\tcodeMap [4]map[uint64]string{")
-	// for i := 0; i < 4; i++ {
-	// 	codeMap := cmap.codeMap[i]
-	// 	fmt.Printf("\tmap[uint64]string{ //%d entries\n", len(codeMap))
-	// 	for j, cs := range codeMap {
-	// 		fmt.Printf("\t%#v, // %d of %d\n", cs, j+1, len(codeMap))
-	// 	}
-	// 	fmt.Println("},")
-	// }
 
+	codespaces := cmap.Codespaces()
+	if len(codespaces) > 0 {
+		fmt.Printf("\tcodespaces: []Codespace{ // %d entries\n", len(codespaces))
+		for _, r := range sortCodespaces(codespaces) {
+			fmt.Printf("\t\tCodespace{Low:0x%04x, High:0x%04x, NumBytes:%4d,},\n",
+				r.Low, r.High, r.NumBytes)
+		}
+		fmt.Println("\t},")
+	}
+
+	cidRanges := cmap.CidRanges()
+	if len(cidRanges) > 0 {
+		fmt.Printf("\tcidRanges: []CIDRange{ // %d entries\n", len(cidRanges))
+		for _, r := range cidRanges {
+			fmt.Printf("\t\tCIDRange{From:0x%04x, To:0x%04x, Cid:%4d},\n", r.From, r.To, r.Cid)
+		}
+		fmt.Println("\t},")
+	}
+
+	codeToUnicode := cmap.CodeToUnicode()
+	if len(codeToUnicode) > 0 {
+		fmt.Printf("\tcodeToUnicode: map[CharCode]string{ // %d entries\n", len(codeToUnicode))
+		for _, code := range sortCodeToUnicode(codeToUnicode) {
+			s := codeToUnicode[code]
+			fmt.Printf("\t\t0x%02x: %s, // %s\n", code, stringLiteral(s), printable(s))
+		}
+		fmt.Println("\t},")
+	}
+
+	fmt.Println("},")
+}
+
+func stringLiteral(str string) string {
+	parts := []string{}
+	for _, r := range str {
+		if r < 0x100 {
+			parts = append(parts, fmt.Sprintf(`"\x%02x"`, r)) //"\x10"
+		} else {
+			parts = append(parts, fmt.Sprintf("%+q", string(r)))
+		}
+	}
+	return strings.Join(parts, "")
+}
+
+func printable(str string) string {
+	parts := []string{}
+	hasPrintable := false
+	for _, r := range str {
+		if unicode.IsPrint(r) {
+			parts = append(parts, fmt.Sprintf("%q", string(r)))
+			hasPrintable = true
+		} else {
+			parts = append(parts, fmt.Sprintf("%+q", string(r)))
+		}
+	}
+	if !hasPrintable {
+		return ""
+	}
+	return strings.Join(parts, "")
 }
 
 func listFiles(dir string) []string {

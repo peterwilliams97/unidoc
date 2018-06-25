@@ -211,11 +211,12 @@ func (font pdfFontType0) String() string {
 		font.DescendantFont.String())
 }
 
-func (font pdfFontType0) CharcodeBytesToUnicode(src []byte) string {
+// CharcodeBytesToUnicode converts PDF character codes `charcodes` to a Go unicode string.
+func (font pdfFontType0) CharcodeBytesToUnicode(charcodes []byte) string {
 	switch t := font.DescendantFont.context.(type) {
 	case *pdfCIDFontType0:
 		cmap := font.CMap
-		codes := cmap.ReadCodes(src)
+		codes := cmap.ReadCodes(charcodes)
 		cidToRune := t.cidToRune
 		if len(cidToRune) == 0 {
 			fmt.Printf("*** cmap=%s\n", cmap.String())

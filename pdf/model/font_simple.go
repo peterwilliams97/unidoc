@@ -87,8 +87,8 @@ func (font pdfFontSimple) GetGlyphCharMetrics(glyph string) (fonts.CharMetrics, 
 }
 
 // newSimpleFontFromPdfObject creates a pdfFontSimple from dictionary `d`. Elements of `d` that
-// are already parsed are contained in `skeleton`. An error is returned
-// if there is a problem with loading.
+// are already parsed are contained in `skeleton`.
+// An error is returned if there is a problem with loading.
 // !@#$ Just return a base 14 font, if obj is a base 14 font
 //
 // The value of Encoding is subject to limitations that are described in 9.6.6, "Character Encoding".
@@ -156,7 +156,8 @@ func newSimpleFontFromPdfObject(obj PdfObject, skeleton *PdfFont) (*pdfFontSimpl
 	}
 
 	if len(widths) != (font.lastChar - font.firstChar + 1) {
-		common.Log.Debug("Invalid widths length != %d (%d)", font.lastChar-font.firstChar+1, len(widths))
+		common.Log.Debug("ERROR: Invalid widths length != %d (%d)",
+			font.lastChar-font.firstChar+1, len(widths))
 		return nil, ErrRangeError
 	}
 	font.charWidths = widths
@@ -281,15 +282,15 @@ func NewPdfFontFromTTFFile(filePath string) (*PdfFont, error) {
 	missingWidth := k * float64(ttf.Widths[0])
 	vals := []float64{}
 
-	for charcode := 32; charcode <= 255; charcode++ {
-		runeVal, found := truefont.Encoder().CharcodeToRune(uint16(charcode))
+	for code := 32; code <= 255; code++ {
+		r, found := truefont.Encoder().CharcodeToRune(uint16(code))
 		if !found {
-			common.Log.Debug("Rune not found (charcode: %d)", charcode)
+			common.Log.Debug("Rune not found (code: %d)", code)
 			vals = append(vals, missingWidth)
 			continue
 		}
 
-		pos, ok := ttf.Chars[uint16(runeVal)]
+		pos, ok := ttf.Chars[uint16(r)]
 		if !ok {
 			common.Log.Debug("Rune not in TTF Chars")
 			vals = append(vals, missingWidth)

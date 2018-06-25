@@ -25,10 +25,12 @@ type SimpleEncoder struct {
 	glyphToCode map[string]uint16
 }
 
+// NewSimpleTextEncoder returns a SimpleEncoder based on predefined encoding `baseName` and
+// difference map `differences`.
 func NewSimpleTextEncoder(baseName string, differences map[byte]string) (SimpleEncoder, error) {
 	baseEncoding, ok := simpleEncodings[baseName]
 	if !ok {
-		common.Log.Debug("Error: NewSimpleTextEncoder. Unknown encoding %q", baseName)
+		common.Log.Debug("ERROR: NewSimpleTextEncoder. Unknown encoding %q", baseName)
 		return SimpleEncoder{}, errors.New("Unsupported font encoding")
 	}
 	codeToRune := map[uint16]rune{}
@@ -45,8 +47,7 @@ func NewSimpleTextEncoder(baseName string, differences map[byte]string) (SimpleE
 	return makeEncoder(baseName, codeToRune), nil
 }
 
-// Convert a raw unicode string (series of runes) to an encoded string (series of character codes) to
-// be used in PDF.
+// Encode converts a Go unicode string `raw` to a PDF encoded string.
 func (se SimpleEncoder) Encode(raw string) string {
 	return doEncode(se, raw)
 }
@@ -83,13 +84,13 @@ func (se SimpleEncoder) CharcodeToRune(code uint16) (rune, bool) {
 	return doCharcodeToRune(se, code)
 }
 
-// Convert rune to glyph name.
+// RuneToGlyph returns the glyph corresponding to rune `r`.
 // The bool return flag is true if there was a match, and false otherwise.
-func (se SimpleEncoder) RuneToGlyph(val rune) (string, bool) {
-	return runeToGlyph(val, glyphlistRuneToGlyphMap)
+func (se SimpleEncoder) RuneToGlyph(r rune) (string, bool) {
+	return runeToGlyph(r, glyphlistRuneToGlyphMap)
 }
 
-// Convert glyph to rune.
+// GlyphToRune returns the rune corresponding to glyph `glyph`.
 // The bool return flag is true if there was a match, and false otherwise.
 func (se SimpleEncoder) GlyphToRune(glyph string) (rune, bool) {
 	return glyphToRune(glyph, glyphlistGlyphToRuneMap)
@@ -109,6 +110,7 @@ func (se SimpleEncoder) ToPdfObject() PdfObject {
 	return MakeIndirectObject(dict)
 }
 
+// makeEncoder returns a SimpleEncoder based on `codeToRune`.
 func makeEncoder(baseName string, codeToRune map[uint16]rune) SimpleEncoder {
 	codeToGlyph := map[uint16]string{}
 	glyphToCode := map[string]uint16{}

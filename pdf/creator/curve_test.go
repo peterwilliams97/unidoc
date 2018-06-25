@@ -5,7 +5,15 @@
 
 package creator
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/unidoc/unidoc/common"
+)
+
+func init() {
+	common.SetLogger(common.NewConsoleLogger(common.LogLevelDebug))
+}
 
 func TestNewCurve(t *testing.T) {
 	creator := New()

@@ -10,7 +10,7 @@
 package fonts
 
 import (
-	"github.com/unidoc/unidoc/pdf/core"
+	. "github.com/unidoc/unidoc/pdf/core"
 	"github.com/unidoc/unidoc/pdf/model/textencoding"
 )
 
@@ -49,13 +49,13 @@ func (font FontHelveticaBold) GetGlyphCharMetrics(glyph string) (CharMetrics, bo
 }
 
 // ToPdfObject returns a primitive PDF object representation of the font.
-func (font FontHelveticaBold) ToPdfObject() core.PdfObject {
-	obj := &core.PdfIndirectObject{}
+func (font FontHelveticaBold) ToPdfObject() PdfObject {
+	obj := &PdfIndirectObject{}
 
-	fontDict := core.MakeDict()
-	fontDict.Set("Type", core.MakeName("Font"))
-	fontDict.Set("Subtype", core.MakeName("Type1"))
-	fontDict.Set("BaseFont", core.MakeName("Helvetica-Bold"))
+	fontDict := MakeDict()
+	fontDict.Set("Type", MakeName("Font"))
+	fontDict.Set("Subtype", MakeName("Type1"))
+	fontDict.Set("BaseFont", MakeName("Helvetica-Bold"))
 	fontDict.Set("Encoding", font.encoder.ToPdfObject())
 
 	obj.PdfObject = fontDict

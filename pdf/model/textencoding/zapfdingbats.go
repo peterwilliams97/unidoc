@@ -7,7 +7,7 @@ package textencoding
 
 import (
 	"github.com/unidoc/unidoc/common"
-	"github.com/unidoc/unidoc/pdf/core"
+	. "github.com/unidoc/unidoc/pdf/core"
 )
 
 // Encoding for ZapfDingbats font.
@@ -15,11 +15,10 @@ type ZapfDingbatsEncoder struct {
 }
 
 func NewZapfDingbatsEncoder() ZapfDingbatsEncoder {
-	encoder := ZapfDingbatsEncoder{}
-	return encoder
+	return ZapfDingbatsEncoder{}
 }
 
-// Convert a raw utf8 string (series of runes) to an encoded string (series of character codes) to be used in PDF.
+// Encode converts the Go unicode string `raw` to a PDF encoded string.
 func (enc ZapfDingbatsEncoder) Encode(raw string) string {
 	encoded := []byte{}
 	for _, rune := range raw {
@@ -122,13 +121,13 @@ func (enc ZapfDingbatsEncoder) GlyphToRune(glyph string) (rune, bool) {
 }
 
 // Convert to PDF Object.
-func (enc ZapfDingbatsEncoder) ToPdfObject() core.PdfObject {
-	dict := core.MakeDict()
-	dict.Set("Type", core.MakeName("Encoding"))
+func (enc ZapfDingbatsEncoder) ToPdfObject() PdfObject {
+	dict := MakeDict()
+	dict.Set("Type", MakeName("Encoding"))
 
 	// Returning an empty Encoding object with no differences. Indicates that we are using the font's built-in
 	// encoding.
-	return core.MakeIndirectObject(dict)
+	return MakeIndirectObject(dict)
 }
 
 var zapfDingbatsEncodingCharcodeToGlyphMap = map[uint16]string{

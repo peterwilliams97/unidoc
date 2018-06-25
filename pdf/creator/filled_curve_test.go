@@ -8,8 +8,13 @@ package creator
 import (
 	"testing"
 
+	"github.com/unidoc/unidoc/common"
 	"github.com/unidoc/unidoc/pdf/contentstream/draw"
 )
+
+func init() {
+	common.SetLogger(common.NewConsoleLogger(common.LogLevelDebug))
+}
 
 func CreateFillCurve(x0, y0, x1, y1, x2, y2, x3, y3 float64) draw.CubicBezierCurve {
 	return draw.NewCubicBezierCurve(x0, y0, x1, y1, x2, y2, x3, y3)

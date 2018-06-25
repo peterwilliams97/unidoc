@@ -5,4 +5,10 @@
 
 package extractor
 
-var isTesting = false
+import "errors"
+
+var (
+	isTesting = false
+
+	ErrTypeCheck = errors.New("Type check error") // !@#$ Move to core
+)

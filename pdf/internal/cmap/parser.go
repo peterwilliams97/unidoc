@@ -9,7 +9,6 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -111,11 +110,11 @@ func (p *cMapParser) parseComment() (string, error) {
 	for {
 		bb, err := p.reader.Peek(1)
 		if err != nil {
-			common.Log.Debug("Error %s", err.Error())
+			common.Log.Debug("parseComment: err=%v", err)
 			return r.String(), err
 		}
 		if isFirst && bb[0] != '%' {
-			return r.String(), errors.New("Comment should start with %")
+			return r.String(), ErrBadCMapComment
 		}
 		isFirst = false
 		if (bb[0] != '\r') && (bb[0] != '\n') {
@@ -292,12 +291,12 @@ func (p *cMapParser) parseHexString() (cmapHexString, error) {
 
 	if buf.Len()%2 == 1 {
 		common.Log.Debug("parseHexString: appending '0' to %#q", buf.String())
-		panic("4444")
 		buf.WriteByte('0')
 	}
 
+	numBytes := buf.Len() / 2
 	hexb, _ := hex.DecodeString(buf.String())
-	return cmapHexString{b: hexb}, nil
+	return cmapHexString{numBytes: numBytes, b: hexb}, nil
 }
 
 // Starts with '[' ends with ']'.  Can contain any kinds of direct objects.
@@ -339,11 +338,11 @@ func (p *cMapParser) parseDict() (cmapDict, error) {
 	// Pass the '<<'
 	c, _ := p.reader.ReadByte()
 	if c != '<' {
-		return dict, errors.New("Invalid dict")
+		return dict, ErrBadCMapDict
 	}
 	c, _ = p.reader.ReadByte()
 	if c != '<' {
-		return dict, errors.New("Invalid dict")
+		return dict, ErrBadCMapDict
 	}
 
 	for {
@@ -363,7 +362,7 @@ func (p *cMapParser) parseDict() (cmapDict, error) {
 		key, err := p.parseName()
 		common.Log.Trace("Key: %s", key.Name)
 		if err != nil {
-			common.Log.Debug("ERROR: Returning name err %s", err)
+			common.Log.Debug("ERROR: Returning name. err=%v", err)
 			return dict, err
 		}
 

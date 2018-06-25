@@ -10,7 +10,7 @@
 package fonts
 
 import (
-	"github.com/unidoc/unidoc/pdf/core"
+	. "github.com/unidoc/unidoc/pdf/core"
 	"github.com/unidoc/unidoc/pdf/model/textencoding"
 )
 
@@ -48,17 +48,14 @@ func (font FontCourier) GetGlyphCharMetrics(glyph string) (CharMetrics, bool) {
 }
 
 // ToPdfObject returns a primitive PDF object representation of the font.
-func (font FontCourier) ToPdfObject() core.PdfObject {
-	obj := &core.PdfIndirectObject{}
-
-	fontDict := core.MakeDict()
-	fontDict.Set("Type", core.MakeName("Font"))
-	fontDict.Set("Subtype", core.MakeName("Type1"))
-	fontDict.Set("BaseFont", core.MakeName("Courier"))
+func (font FontCourier) ToPdfObject() PdfObject {
+	fontDict := MakeDict()
+	fontDict.Set("Type", MakeName("Font"))
+	fontDict.Set("Subtype", MakeName("Type1"))
+	fontDict.Set("BaseFont", MakeName("Courier"))
 	fontDict.Set("Encoding", font.encoder.ToPdfObject())
 
-	obj.PdfObject = fontDict
-	return obj
+	return &PdfIndirectObject{PdfObject: fontDict}
 }
 
 // Courier font metics loaded from afms/Courier.afm.  See afms/MustRead.html for license information.
