@@ -27,6 +27,7 @@ import (
 	gocolor "image/color"
 	"image/jpeg"
 	"io"
+	"strings"
 
 	// Need two slightly different implementations of LZW (EarlyChange parameter).
 	lzw0 "compress/lzw"
@@ -1760,14 +1761,11 @@ func newMultiEncoderFromStream(streamObj *PdfObjectStream) (*MultiEncoder, error
 }
 
 func (this *MultiEncoder) GetFilterName() string {
-	name := ""
-	for idx, encoder := range this.encoders {
-		name += encoder.GetFilterName()
-		if idx < len(this.encoders)-1 {
-			name += " "
-		}
+	parts := []string{}
+	for _, encoder := range this.encoders {
+		parts = append(parts, encoder.GetFilterName())
 	}
-	return name
+	return strings.Join(parts, " ")
 }
 
 func (this *MultiEncoder) MakeDecodeParams() PdfObject {

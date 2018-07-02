@@ -8,6 +8,7 @@ package core
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	"github.com/unidoc/unidoc/common"
 )
@@ -176,18 +177,17 @@ func MakeStream(contents []byte, encoder StreamEncoder) (*PdfObjectStream, error
 func (bool *PdfObjectBool) String() string {
 	if *bool {
 		return "true"
-	} else {
-		return "false"
 	}
+	return "false"
 }
 
 // DefaultWriteString outputs the object as it is to be written to file.
 func (bool *PdfObjectBool) DefaultWriteString() string {
 	if *bool {
 		return "true"
-	} else {
-		return "false"
 	}
+	return "false"
+
 }
 
 func (int *PdfObjectInteger) String() string {
@@ -301,28 +301,20 @@ func (array *PdfObjectArray) ToIntegerArray() ([]int, error) {
 }
 
 func (array *PdfObjectArray) String() string {
-	outStr := "["
-	for ind, o := range *array {
-		outStr += o.String()
-		if ind < (len(*array) - 1) {
-			outStr += ", "
-		}
+	parts := []string{}
+	for _, o := range *array {
+		parts = append(parts, o.String())
 	}
-	outStr += "]"
-	return outStr
+	return fmt.Sprintf("[%s]", strings.Join(parts, ", "))
 }
 
 // DefaultWriteString outputs the object as it is to be written to file.
 func (array *PdfObjectArray) DefaultWriteString() string {
-	outStr := "["
-	for ind, o := range *array {
-		outStr += o.DefaultWriteString()
-		if ind < (len(*array) - 1) {
-			outStr += " "
-		}
+	parts := []string{}
+	for _, o := range *array {
+		parts = append(parts, o.DefaultWriteString())
 	}
-	outStr += "]"
-	return outStr
+	return fmt.Sprintf("[%s]", strings.Join(parts, " "))
 }
 
 // Append adds an PdfObject to the array.
@@ -374,27 +366,22 @@ func (d *PdfObjectDictionary) Merge(another *PdfObjectDictionary) {
 }
 
 func (d *PdfObjectDictionary) String() string {
-	outStr := "Dict("
+	parts := []string{}
 	for _, k := range d.keys {
-		v := d.dict[k]
-		outStr += fmt.Sprintf("\"%s\": %s, ", k, v.String())
+		parts = append(parts, fmt.Sprintf("\"%s\": %s", k, d.dict[k].String()))
 	}
-	outStr += ")"
-	return outStr
+	return fmt.Sprintf("Dict(%s)", strings.Join(parts, ", "))
 }
 
 // DefaultWriteString outputs the object as it is to be written to file.
 func (d *PdfObjectDictionary) DefaultWriteString() string {
-	outStr := "<<"
+	parts := []string{}
 	for _, k := range d.keys {
 		v := d.dict[k]
 		common.Log.Trace("Writing k: %s %T %v %v", k, v, k, v)
-		outStr += k.DefaultWriteString()
-		outStr += " "
-		outStr += v.DefaultWriteString()
+		parts = append(parts, fmt.Sprintf("%s %s", k.DefaultWriteString(), v.DefaultWriteString()))
 	}
-	outStr += ">>"
-	return outStr
+	return fmt.Sprintf("<<%s>>", strings.Join(parts, ", "))
 }
 
 // Set sets the dictionary's key -> val mapping entry. Overwrites if key already set.

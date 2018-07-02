@@ -89,7 +89,7 @@ func DecodeStream(streamObj *PdfObjectStream) ([]byte, error) {
 		common.Log.Debug("Stream decoding failed: %v", err)
 		return nil, err
 	}
-	common.Log.Trace("Encoder: %#v\n", encoder)
+	common.Log.Trace("Encoder: %#v", encoder)
 
 	decoded, err := encoder.DecodeStream(streamObj)
 	if err != nil {
