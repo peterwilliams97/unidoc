@@ -18,11 +18,12 @@ import (
 	"os"
 	"time"
 
+	"strings"
+
 	"github.com/unidoc/unidoc/common"
 	"github.com/unidoc/unidoc/common/license"
 	. "github.com/unidoc/unidoc/pdf/core"
 	"github.com/unidoc/unidoc/pdf/model/fonts"
-	"strings"
 )
 
 var pdfCreator = ""
@@ -342,8 +343,6 @@ func (this *PdfWriter) AddPage(page *PdfPage) error {
 
 	this.addObject(pageObj)
 
-
-
 	// Traverse the page and record all object references.
 	err := this.addObjects(pDict)
 	if err != nil {
@@ -585,7 +584,8 @@ func (this *PdfWriter) Write(ws io.WriteSeeker) error {
 	// Check pending objects prior to write.
 	for pendingObj, pendingObjDict := range this.pendingObjects {
 		if !this.hasObject(pendingObj) {
-			common.Log.Debug("ERROR Pending object %+v %T (%p) never added for writing", pendingObj, pendingObj, pendingObj)
+			common.Log.Debug("ERROR Pending object %+v %T (%p) never added for writing",
+				pendingObj, pendingObj, pendingObj)
 			for _, key := range pendingObjDict.Keys() {
 				val := pendingObjDict.Get(key)
 				if val == pendingObj {
@@ -613,7 +613,7 @@ func (this *PdfWriter) Write(ws io.WriteSeeker) error {
 	// Write objects
 	common.Log.Trace("Writing %d obj", len(this.objects))
 	for idx, obj := range this.objects {
-		common.Log.Trace("Writing %d", idx)
+		common.Log.Trace("Writing %d %#v", idx, obj)
 		this.writer.Flush()
 		offset, _ := ws.Seek(0, os.SEEK_CUR)
 		offsets = append(offsets, offset)

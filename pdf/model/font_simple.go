@@ -96,6 +96,18 @@ func (font pdfFontSimple) GetGlyphCharMetrics(glyph string) (fonts.CharMetrics, 
 //
 // !@#$ 9.6.6.4 Encodings for TrueType Fonts (page 265)
 //      Need to get TrueType font's cmap
+//
+// ~/testdata/crypto/B02.pdf has no FirstChar, LastChar, Widths, so I have removed the checks for
+// their existance.
+//    22 0 obj
+//    <<
+//    /BaseFont/Symbol
+//    /Encoding/MacRomanEncoding
+//    /Type/Font
+//    /Subtype/TrueType
+//    /Name/F9
+//    >>
+//    endobj
 func newSimpleFontFromPdfObject(obj PdfObject, skeleton *fontSkeleton, std14 bool) (*pdfFontSimple, error) {
 	font := &pdfFontSimple{fontSkeleton: skeleton}
 
@@ -106,10 +118,10 @@ func newSimpleFontFromPdfObject(obj PdfObject, skeleton *fontSkeleton, std14 boo
 		obj = d.Get("FirstChar")
 		if obj == nil {
 			// See /Users/pcadmin/testdata/shamirturing.pdf
-			if skeleton.subtype == "TrueType" {
-				common.Log.Debug("ERROR: FirstChar attribute missing")
-				return nil, ErrRequiredAttributeMissing
-			}
+			// if skeleton.subtype == "TrueType" {
+			// 	common.Log.Debug("ERROR: FirstChar attribute missing. font=%s d=%s", skeleton, d)
+			// 	return nil, ErrRequiredAttributeMissing
+			// }
 			obj = PdfObject(MakeInteger(0))
 		}
 		font.FirstChar = obj
@@ -123,10 +135,10 @@ func newSimpleFontFromPdfObject(obj PdfObject, skeleton *fontSkeleton, std14 boo
 
 		obj = d.Get("LastChar")
 		if obj == nil {
-			if skeleton.subtype == "TrueType" {
-				common.Log.Debug("ERROR: LastChar attribute missing")
-				return nil, ErrRequiredAttributeMissing
-			}
+			// if skeleton.subtype == "TrueType" {
+			// 	common.Log.Debug("ERROR: LastChar attribute missing")
+			// 	return nil, ErrRequiredAttributeMissing
+			// }
 			obj = PdfObject(MakeInteger(0))
 		}
 		font.LastChar = obj
@@ -139,30 +151,31 @@ func newSimpleFontFromPdfObject(obj PdfObject, skeleton *fontSkeleton, std14 boo
 
 		font.charWidths = []float64{}
 		obj = d.Get("Widths")
-		if obj == nil {
-			common.Log.Debug("ERROR: Widths missing from font")
-			return nil, ErrRequiredAttributeMissing
-		}
-		font.Widths = obj
+		if obj != nil {
+			// 	common.Log.Debug("ERROR: Widths missing from font")
+			// 	return nil, ErrRequiredAttributeMissing
+			// }
+			font.Widths = obj
 
-		arr, ok := TraceToDirectObject(obj).(*PdfObjectArray)
-		if !ok {
-			common.Log.Debug("ERROR: Widths attribute != array (%T)", arr)
-			return nil, ErrTypeError
-		}
+			arr, ok := TraceToDirectObject(obj).(*PdfObjectArray)
+			if !ok {
+				common.Log.Debug("ERROR: Widths attribute != array (%T)", arr)
+				return nil, ErrTypeError
+			}
 
-		widths, err := arr.ToFloat64Array()
-		if err != nil {
-			common.Log.Debug("ERROR: converting widths to array")
-			return nil, err
-		}
+			widths, err := arr.ToFloat64Array()
+			if err != nil {
+				common.Log.Debug("ERROR: converting widths to array")
+				return nil, err
+			}
 
-		if len(widths) != (font.lastChar - font.firstChar + 1) {
-			common.Log.Debug("ERROR: Invalid widths length != %d (%d)",
-				font.lastChar-font.firstChar+1, len(widths))
-			return nil, ErrRangeError
+			if len(widths) != (font.lastChar - font.firstChar + 1) {
+				common.Log.Debug("ERROR: Invalid widths length != %d (%d)",
+					font.lastChar-font.firstChar+1, len(widths))
+				return nil, ErrRangeError
+			}
+			font.charWidths = widths
 		}
-		font.charWidths = widths
 	}
 
 	font.Encoding = TraceToDirectObject(d.Get("Encoding"))
@@ -190,14 +203,29 @@ func (font *pdfFontSimple) addEncoding() error {
 		font.SetEncoder(encoder)
 	}
 
-	if skeleton.subtype == "Type1" {
-		// XXX: !@#$ Is this the right order? Do the /Differences need to be reapplied?
-		descriptor := skeleton.fontDescriptor
-		if descriptor != nil &&
-			descriptor.fontFile != nil &&
-			descriptor.fontFile.encoder != nil {
-			common.Log.Debug("Using fontFile")
-			font.SetEncoder(descriptor.fontFile.encoder)
+	descriptor := skeleton.fontDescriptor
+	if descriptor != nil {
+		switch skeleton.subtype {
+		case "Type1":
+			// XXX: !@#$ Is this the right order? Do the /Differences need to be reapplied?
+			if descriptor.fontFile != nil && descriptor.fontFile.encoder != nil {
+				common.Log.Debug("Using fontFile")
+				font.SetEncoder(descriptor.fontFile.encoder)
+			}
+		case "TrueType":
+			// if descriptor.fontFile2 != nil && descriptor.fontFile2.Chars != nil {
+			// 	common.Log.Debug("Using fontFile2")
+			// 	encoder := textencoding.NewTrueTypeFontEncoder(descriptor.fontFile2.Chars)
+			// 	font.SetEncoder(encoder)
+			// }
+			if descriptor.fontFile2 != nil {
+				common.Log.Debug("Using fontFile2")
+				encoder, err := descriptor.fontFile2.MakeEncoder()
+				if err != nil {
+					return err
+				}
+				font.SetEncoder(encoder)
+			}
 		}
 	}
 

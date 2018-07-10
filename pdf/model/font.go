@@ -57,8 +57,8 @@ func (font PdfFont) ToUnicode() string {
 	return font.toUnicodeCmap.Name()
 }
 
-// NewStandard14Font returns the standard 14 font named`basefont` as a PdfFont, or an error if it
-// `basefont` is not one the standard 14 fonts.
+// NewStandard14Font returns the standard 14 font named `basefont` as a *PdfFont, or an error if it
+// `basefont` is not one the standard 14 font names.
 func NewStandard14Font(basefont string) (*PdfFont, error) {
 	std, ok := fonts.Standard14Fonts[basefont]
 	if !ok {
@@ -488,6 +488,7 @@ type PdfFontDescriptor struct {
 	CharSet      PdfObject
 
 	*fontFile
+	fontFile2 *fonts.TtfType
 
 	// Additional entries for CIDFonts
 	Style  PdfObject
@@ -499,6 +500,7 @@ type PdfFontDescriptor struct {
 	container *PdfIndirectObject
 }
 
+// String returns a string describing the font descriptor.
 func (descriptor *PdfFontDescriptor) String() string {
 	parts := []string{}
 	if descriptor.FontName != nil {
@@ -507,9 +509,18 @@ func (descriptor *PdfFontDescriptor) String() string {
 	if descriptor.FontFamily != nil {
 		parts = append(parts, descriptor.FontFamily.String())
 	}
-	parts = append(parts, fmt.Sprintf("FontFile=%t", descriptor.FontFile != nil))
-	parts = append(parts, fmt.Sprintf("FontFile2=%t", descriptor.FontFile2 != nil))
+	if descriptor.fontFile != nil {
+		parts = append(parts, descriptor.fontFile.String())
+	} else {
+		parts = append(parts, fmt.Sprintf("FontFile=%t", descriptor.FontFile2 != nil))
+	}
+	if descriptor.fontFile2 != nil {
+		parts = append(parts, descriptor.fontFile2.String())
+	} else {
+		parts = append(parts, fmt.Sprintf("FontFile2=%t", descriptor.FontFile2 != nil))
+	}
 	parts = append(parts, fmt.Sprintf("FontFile3=%t", descriptor.FontFile3 != nil))
+
 	return fmt.Sprintf("FONT_DESCRIPTON{%s}", strings.Join(parts, ", "))
 }
 
@@ -579,6 +590,14 @@ func newPdfFontDescriptorFromPdfObject(obj PdfObject) (*PdfFontDescriptor, error
 		}
 		common.Log.Debug("fontfile=%s", fontfile)
 		descriptor.fontFile = fontfile
+	}
+	if descriptor.FontFile2 != nil {
+		fontfile2, err := fonts.NewFontFile2FromPdfObject(descriptor.FontFile2)
+		if err != nil {
+			return descriptor, err
+		}
+		common.Log.Debug("fontfile2=%s", fontfile2.String())
+		descriptor.fontFile2 = &fontfile2
 	}
 	return descriptor, nil
 }

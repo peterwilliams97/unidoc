@@ -3,11 +3,62 @@
  * file 'LICENSE.md', which is part of this source code package.
  */
 
+/*
+ // non-symbolic fonts don't have a built-in encoding per se, but there encoding is
+            // assumed to be StandardEncoding by the PDF spec unless an explicit Encoding is present
+            // which will override this anyway
+            if (getSymbolicFlag() != null &&!getSymbolicFlag())
+            {
+                System.out.println("@@@2 StandardEncoding");
+                return StandardEncoding.INSTANCE;
+            }
+
+            // normalise the standard 14 name, e.g "Symbol,Italic" -> "Symbol"
+            String standard14Name = Standard14Fonts.getMappedFontName(getName());
+
+            // likewise, if the font is standard 14 then we know it's Standard Encoding
+            if (isStandard14() &&
+                !standard14Name.equals("Symbol") &&
+                !standard14Name.equals("ZapfDingbats"))
+            {
+                 System.out.println("@@@3 StandardEncoding");
+                return StandardEncoding.INSTANCE;
+            }
+
+            // synthesize an encoding, so that getEncoding() is always usable
+            PostScriptTable post = ttf.getPostScript();
+            Map<Integer, String> codeToName = new HashMap<Integer, String>();
+            for (int code = 0; code <= 256; code++)
+            {
+                int gid = codeToGID(code);
+                if (gid > 0)
+                {
+                    String name = null;
+                    if (post != null)
+                    {
+                        name = post.getName(gid);
+                    }
+                    if (name == null)
+                    {
+                        // GID pseudo-name
+                        name = Integer.toString(gid);
+                    }
+                    codeToName.put(code, name);
+                }
+            }
+            System.out.println("@@@4 synthesized");
+            return new BuiltInEncoding(codeToName);
+        }
+
+*/
+
 package textencoding
 
 import (
 	"bytes"
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/unidoc/unidoc/common"
 	. "github.com/unidoc/unidoc/pdf/core"
@@ -33,9 +84,31 @@ func NewTrueTypeFontEncoder(runeToGlyphIndexMap map[uint16]uint16) TrueTypeFontE
 	}
 }
 
-// String returns a string that describes `enc`.
-func (enc TrueTypeFontEncoder) String() string {
-	return "TrueTypeFontEncoder"
+// ttEncoderNumEntries is the maximum number of encoding entries shown in SimpleEncoder.String()
+const ttEncoderNumEntries = 1000
+
+// String returns a string that describes `se`.
+func (se TrueTypeFontEncoder) String() string {
+	parts := []string{
+		fmt.Sprintf("%d entries", len(se.runeToGlyphIndexMap)),
+	}
+
+	codes := []int{}
+	for c := range se.runeToGlyphIndexMap {
+		codes = append(codes, int(c))
+	}
+	sort.Ints(codes)
+	numCodes := len(codes)
+	if numCodes > ttEncoderNumEntries {
+		numCodes = ttEncoderNumEntries
+	}
+
+	for i := 0; i < numCodes; i++ {
+		c := codes[i]
+		parts = append(parts, fmt.Sprintf("%d=0x%02x: %q",
+			c, c, se.runeToGlyphIndexMap[uint16(c)]))
+	}
+	return fmt.Sprintf("TRUETYPE_ENCODER{%s}", strings.Join(parts, ", "))
 }
 
 // Encode converts the Go unicode string `raw` to a PDF encoded string.
@@ -113,7 +186,7 @@ func (enc TrueTypeFontEncoder) CharcodeToRune(code uint16) (rune, bool) {
 			return rune(code), true
 		}
 	}
-
+	common.Log.Debug("CharcodeToRune: No match. code=0x%04x enc=%s", code, enc)
 	return 0, false
 }
 

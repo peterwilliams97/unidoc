@@ -29,7 +29,7 @@ var (
 
 // SimpleEncoder represents a 1 byte encoding
 type SimpleEncoder struct {
-	baseName string
+	baseName     string
 	baseEncoding map[uint16]rune
 	differences  map[byte]string
 	codeToGlyph  map[uint16]string
@@ -111,7 +111,7 @@ func (se SimpleEncoder) String() string {
 
 	for i := 0; i < numCodes; i++ {
 		c := codes[i]
-		parts = append(parts, fmt.Sprintf("%4d=0x%02x: %q", c, c, se.codeToGlyph[uint16(c)]))
+		parts = append(parts, fmt.Sprintf("%d=0x%02x: %q", c, c, se.codeToGlyph[uint16(c)]))
 	}
 	return fmt.Sprintf("SIMPLE_ENCODER{%s}", strings.Join(parts, ", "))
 }
