@@ -30,6 +30,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/unidoc/unidoc/common"
@@ -66,13 +67,14 @@ func (rec *TtfType) MakeEncoder() (textencoding.SimpleEncoder, error) {
 	for code := uint16(0); code <= 256; code++ {
 		gid := rec.Chars[code]
 		glyph := ""
-		if gid < 0 || int(gid) >= len(rec.GlyphNames) {
+		if 0 <= gid && int(gid) < len(rec.GlyphNames) {
+			glyph = rec.GlyphNames[gid]
+			encoding[code] = glyph
+		} /*else {
 			common.Log.Debug("No match for code=%d gid=%d", code, gid)
 			glyph = fmt.Sprintf("%d", gid)
-		} else {
-			glyph = rec.GlyphNames[gid]
-		}
-		encoding[code] = glyph
+		}*/
+
 	}
 	return textencoding.NewCustomSimpleTextEncoder(encoding, nil)
 }
@@ -99,7 +101,7 @@ type TtfType struct {
 }
 
 func (ttf *TtfType) String() string {
-	return fmt.Sprintf("FONT_FILE2{%#q Embeddable=%t UnitsPerEm=%d Bold=%t ItalicAngle=%d "+
+	return fmt.Sprintf("FONT_FILE2{%#q Embeddable=%t UnitsPerEm=%d Bold=%t ItalicAngle=%f "+
 		"CapHeight=%d Chars=%d}",
 		ttf.PostScriptName, ttf.Embeddable, ttf.UnitsPerEm, ttf.Bold, ttf.ItalicAngle,
 		ttf.CapHeight, len(ttf.Chars))
@@ -132,6 +134,10 @@ func NewFontFile2FromPdfObject(obj PdfObject) (rec TtfType, err error) {
 	if err != nil {
 		return
 	}
+
+	// fmt.Println("===============&&&&===============")
+	// fmt.Printf("%#q", string(data))
+	// fmt.Println("===============####===============")
 
 	f := bytes.NewReader(data)
 	f.Seek(0, os.SEEK_SET)
@@ -180,9 +186,11 @@ func (t *ttfParser) Parse() (TtfRec TtfType, err error) {
 		err = fmt.Errorf("fonts based on PostScript outlines are not supported")
 		return
 	}
+	// XXX: !@#$ Not sure what to do here. Have seen version="true"
 	if version != "\x00\x01\x00\x00" {
 		err = fmt.Errorf("unrecognized file format")
-		return
+		common.Log.Debug("ERROR: !@#$ unrecognized file format %q", version)
+		// return
 	}
 	numTables := int(t.ReadUShort())
 	t.Skip(3 * 2) // searchRange, entrySelector, rangeShift
@@ -199,10 +207,8 @@ func (t *ttfParser) Parse() (TtfRec TtfType, err error) {
 		t.tables[tag] = offset
 	}
 
-	common.Log.Debug("tables: %d", numTables)
-	for tag, offset := range t.tables {
-		common.Log.Debug("\t%q %5d", tag, offset)
-	}
+	common.Log.Debug(describeTables(t.tables))
+
 	err = t.ParseComponents()
 	if err != nil {
 		return
@@ -210,6 +216,19 @@ func (t *ttfParser) Parse() (TtfRec TtfType, err error) {
 
 	TtfRec = t.rec
 	return
+}
+
+func describeTables(tables map[string]uint32) string {
+	tags := []string{}
+	for tag := range tables {
+		tags = append(tags, tag)
+	}
+	sort.Strings(tags)
+	parts := []string{fmt.Sprintf("TrueType tables: %d", len(tables))}
+	for _, tag := range tags {
+		parts = append(parts, fmt.Sprintf("\t%q %5d", tag, tables[tag]))
+	}
+	return strings.Join(parts, "\n")
 }
 
 // Standard TrueType tables
@@ -240,21 +259,30 @@ func (t *ttfParser) ParseComponents() (err error) {
 	if err != nil {
 		return
 	}
-	err = t.ParseCmap()
-	if err != nil {
-		return
+
+	if _, ok := t.tables["name"]; ok {
+		err = t.ParseName()
+		if err != nil {
+			return
+		}
 	}
-	err = t.ParseName()
-	if err != nil {
-		return
+	if _, ok := t.tables["OS/2"]; ok {
+		err = t.ParseOS2()
+		if err != nil {
+			return
+		}
 	}
-	err = t.ParseOS2()
-	if err != nil {
-		return
+	if _, ok := t.tables["post"]; ok {
+		err = t.ParsePost()
+		if err != nil {
+			return
+		}
 	}
-	err = t.ParsePost()
-	if err != nil {
-		return
+	if _, ok := t.tables["cmap"]; ok {
+		err = t.ParseCmap()
+		if err != nil {
+			return
+		}
 	}
 
 	return
@@ -374,6 +402,12 @@ func (t *ttfParser) parseCmapSubtable31(offset31 int64) (err error) {
 			}
 		}
 	}
+	// for code, glyphId := range data {
+	// 	t.rec.Chars[uint16(code)] = uint16(glyphId)
+	// 	if glyphId != 0 {
+	// 		fmt.Printf("\t0x%02x -> 0x%02x=%c\n", code, glyphId, rune(glyphId))
+	// 	}
+	// }
 	return
 }
 
@@ -525,13 +559,19 @@ func (t *ttfParser) ParseCmap() (err error) {
 			j, version, platformID, encodingID, offset)
 		if platformID == 3 && encodingID == 1 {
 			// (3,1) subtable. Windows Unicode.
+			if offset31 != 0 {
+				panic("duplicate (3,1) cmap")
+			}
 			offset31 = offset
 		} else if platformID == 1 && encodingID == 0 {
 			// (1,0) subtable.
+			if offset10 != 0 {
+				panic("duplicate (1,0) cmap")
+			}
 			offset10 = offset
-
+		} else {
+			panic("unsupported cmap version")
 		}
-		//fmt.Printf("(%d,%d) subtable @ %d\n", platformID, encodingID, offset)
 	}
 
 	// Latin font support based on (3,1) table encoding.

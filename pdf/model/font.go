@@ -84,6 +84,7 @@ func NewPdfFontFromPdfObject(fontObj PdfObject) (*PdfFont, error) {
 // The allowType0 flag indicates whether loading Type0 font should be supported.  This is used to
 // avoid cyclical loading.
 func newPdfFontFromPdfObject(fontObj PdfObject, allowType0 bool) (*PdfFont, error) {
+	common.Log.Debug("fontObj=%s", FlattenObject(fontObj))
 	skeleton, err := newFontSkeletonFromPdfObject(fontObj)
 	if err != nil {
 		return nil, err
@@ -162,6 +163,7 @@ func newPdfFontFromPdfObject(fontObj PdfObject, allowType0 bool) (*PdfFont, erro
 //   conforming writers, instead of using a simple font, shall use a Type 0 font with an Identity-H
 //   encoding and use the glyph indices as character codes, as described following Table 118.
 func (font PdfFont) CharcodeBytesToUnicode(data []byte) (string, error) {
+	common.Log.Debug("showText: data=%+v=%#q", data, data)
 	if font.toUnicodeCmap != nil {
 		unicode, ok := font.toUnicodeCmap.CharcodeBytesToUnicode(data)
 		if ok {
@@ -192,9 +194,9 @@ func (font PdfFont) CharcodeBytesToUnicode(data []byte) (string, error) {
 		for _, code := range charcodes {
 			r, ok := encoder.CharcodeToRune(code)
 			if !ok {
-				common.Log.Debug("ERROR: No rune. code=0x%04x data=[% 02x]=%#q\n"+
+				common.Log.Debug("ERROR: No rune. code=0x%04x data=[% 02x]=%#q charcodes=[% 04x] CID=%t\n"+
 					"\tfont=%s\n\tencoding=%s",
-					code, data, data, font, encoder)
+					code, data, data, charcodes, font.isCIDFont(), font, encoder)
 				r = cmap.MissingCodeRune
 				return string(data), ErrBadText
 			}
@@ -414,6 +416,8 @@ func newFontSkeletonFromPdfObject(fontObj PdfObject) (*fontSkeleton, error) {
 		return nil, ErrRequiredAttributeMissing
 	}
 	font.basefont = basefont
+
+	common.Log.Debug("font=%s", font)
 
 	obj := d.Get("FontDescriptor")
 	if obj != nil {
