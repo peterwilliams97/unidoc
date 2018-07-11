@@ -12,6 +12,8 @@ package extractor
 import (
 	"bytes"
 	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/unidoc/unidoc/common"
 	"github.com/unidoc/unidoc/pdf/contentstream"
@@ -36,6 +38,8 @@ func (e *Extractor) ExtractText() (string, error) {
 func (e *Extractor) ExtractXYText() (*TextList, error) {
 	textList := &TextList{}
 	state := newTextState()
+	fontStack := fontStacker{}
+
 	var to *TextObject
 
 	cstreamParser := contentstream.NewContentStreamParser(e.contents)
@@ -55,9 +59,20 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 			resources *model.PdfPageResources) error {
 
 			operand := op.Operand
-			// common.Log.Debug("++Operand: %s", op.String())
+			common.Log.Debug("++Operand: %+v", op)
 
 			switch operand {
+			case "q":
+				common.Log.Debug("Save font %s\n->%s\n%s",
+					fontStack.peek().Tf, state.Tf, fontStack.String())
+				fontStack.push(state)
+			case "Q":
+				if len(fontStack) >= 1 {
+					common.Log.Debug("Restore font %s\n->%s\n%s",
+						state.Tf, fontStack.peek().Tf, fontStack.String())
+					state = fontStack.pop()
+				}
+
 			case "BT": // Begin text
 				// Begin a text object, initializing the text matrix, Tm, and the text line matrix, Tlm,
 				// to the identity matrix. Text objects shall not be nested; a second BT shall not appear
@@ -412,6 +427,41 @@ func checkOp(op *contentstream.ContentStreamOperation, to *TextObject, numParams
 		}
 	}
 	ok = true
+	return
+}
+
+type fontStacker []TextState
+
+func (fontStack *fontStacker) String() string {
+	parts := []string{"---- font stack"}
+	for i, ts := range *fontStack {
+		s := "<nil>"
+		if ts.Tf != nil {
+			s = ts.Tf.String()
+		}
+		parts = append(parts, fmt.Sprintf("\t%2d: %s", i, s))
+	}
+	return strings.Join(parts, "\n")
+}
+
+func (fontStack *fontStacker) push(textState TextState) {
+	*fontStack = append(*fontStack, textState)
+}
+
+func (fontStack *fontStacker) pop() (textState TextState) {
+	if len(*fontStack) < 1 {
+		return
+	}
+	textState = (*fontStack)[len(*fontStack)-1]
+	*fontStack = (*fontStack)[:len(*fontStack)-1]
+	return
+}
+
+func (fontStack *fontStacker) peek() (textState TextState) {
+	if len(*fontStack) < 1 {
+		return
+	}
+	textState = (*fontStack)[len(*fontStack)-1]
 	return
 }
 

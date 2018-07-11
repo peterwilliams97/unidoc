@@ -88,8 +88,8 @@ func (r *PdfPageResources) ToPdfObject() PdfObject {
 	return d
 }
 
-// Add External Graphics State (GState).  The gsDict can be specified either directly as a dictionary or an indirect
-// object containing a dictionary.
+// Add External Graphics State (GState).  The gsDict can be specified either directly as a dictionary
+// or an indirect object containing a dictionary.
 func (r *PdfPageResources) AddExtGState(gsName PdfObjectName, gsDict PdfObject) error {
 	if r.ExtGState == nil {
 		r.ExtGState = MakeDict()
@@ -120,9 +120,8 @@ func (r *PdfPageResources) GetExtGState(keyName PdfObjectName) (PdfObject, bool)
 
 	if obj := dict.Get(keyName); obj != nil {
 		return obj, true
-	} else {
-		return nil, false
 	}
+	return nil, false
 }
 
 // Check whether a font is defined by the specified keyName.
@@ -151,9 +150,8 @@ func (r *PdfPageResources) GetShadingByName(keyName PdfObjectName) (*PdfShading,
 			return nil, false
 		}
 		return shading, true
-	} else {
-		return nil, false
 	}
+	return nil, false
 }
 
 // Set a shading resource specified by keyName.
@@ -192,9 +190,8 @@ func (r *PdfPageResources) GetPatternByName(keyName PdfObjectName) (*PdfPattern,
 		}
 
 		return pattern, true
-	} else {
-		return nil, false
 	}
+	return nil, false
 }
 
 // Set a pattern resource specified by keyName.
@@ -212,24 +209,24 @@ func (r *PdfPageResources) SetPatternByName(keyName PdfObjectName, pattern PdfOb
 	return nil
 }
 
-// Get the font specified by keyName.  Returns the PdfObject which the entry refers to.
+// Get the font specified by `keyName`.  Returns the PdfObject which the entry refers to.
 // Returns a bool value indicating whether or not the entry was found.
 func (r *PdfPageResources) GetFontByName(keyName PdfObjectName) (PdfObject, bool) {
 	if r.Font == nil {
 		return nil, false
 	}
 
-	fontDict, has := TraceToDirectObject(r.Font).(*PdfObjectDictionary)
-	if !has {
+	fontDict, ok := TraceToDirectObject(r.Font).(*PdfObjectDictionary)
+	if !ok {
 		common.Log.Debug("ERROR: Font not a dictionary! (got %T)", TraceToDirectObject(r.Font))
 		return nil, false
 	}
 
-	if obj := fontDict.Get(keyName); obj != nil {
-		return obj, true
-	} else {
+	obj := fontDict.Get(keyName)
+	if obj == nil {
 		return nil, false
 	}
+	return obj, true
 }
 
 // Check whether a font is defined by the specified keyName.
@@ -291,19 +288,18 @@ func (r *PdfPageResources) HasXObjectByName(keyName PdfObjectName) bool {
 	obj, _ := r.GetXObjectByName(keyName)
 	if obj != nil {
 		return true
-	} else {
-		return false
 	}
+	return false
 }
 
 type XObjectType int
 
 const (
 	XObjectTypeUndefined XObjectType = iota
-	XObjectTypeImage     XObjectType = iota
-	XObjectTypeForm      XObjectType = iota
-	XObjectTypePS        XObjectType = iota
-	XObjectTypeUnknown   XObjectType = iota
+	XObjectTypeImage
+	XObjectTypeForm
+	XObjectTypePS
+	XObjectTypeUnknown
 )
 
 // Returns the XObject with the specified keyName and the object type.
@@ -342,9 +338,8 @@ func (r *PdfPageResources) GetXObjectByName(keyName PdfObjectName) (*PdfObjectSt
 			common.Log.Debug("XObject Subtype not known (%s)", *name)
 			return nil, XObjectTypeUndefined
 		}
-	} else {
-		return nil, XObjectTypeUndefined
 	}
+	return nil, XObjectTypeUndefined
 }
 
 func (r *PdfPageResources) SetXObjectByName(keyName PdfObjectName, stream *PdfObjectStream) error {
