@@ -64,6 +64,7 @@ func (rec *TtfType) MakeEncoder() (textencoding.SimpleEncoder, error) {
 	//            }
 	//        }
 	encoding := map[uint16]string{}
+	shownZero := false
 	for code := uint16(0); code <= 256; code++ {
 		gid, ok := rec.Chars[code]
 		if !ok {
@@ -78,7 +79,12 @@ func (rec *TtfType) MakeEncoder() (textencoding.SimpleEncoder, error) {
 			glyph = string(rune(gid))
 		}
 		encoding[code] = glyph
-		fmt.Printf(" *>> code=%d gid=0x%04x glyph=%q\n", code, gid, glyph)
+		if gid != 0 || !shownZero {
+			fmt.Printf(" *>> code=%d gid=0x%04x glyph=%q\n", code, gid, glyph)
+		}
+		if gid == 0 {
+			shownZero = true
+		}
 	}
 	if len(encoding) == 0 {
 		common.Log.Error("rec=%s", rec)
@@ -494,6 +500,70 @@ func (t *ttfParser) parseCmapSubtable10(offset10 int64) error {
 	// return nil
 }
 
+// ParseCmap parses the cmap table in a TrueType font.
+func (t *ttfParser) ParseCmap() (err error) {
+	var offset int64
+	if err = t.Seek("cmap"); err != nil {
+		panic(err)
+		return
+	}
+	common.Log.Debug("ParseCmap")
+	version := t.ReadUShort()
+	numTables := int(t.ReadUShort())
+	offset10 := int64(0)
+	offset31 := int64(0)
+	tablesDone := map[string]bool{}
+	for j := 0; j < numTables; j++ {
+		platformID := t.ReadUShort()
+		encodingID := t.ReadUShort()
+		offset = int64(t.ReadULong())
+		platEnc := fmt.Sprintf("(%d,%d)", platformID, encodingID)
+		if _, ok := tablesDone[platEnc]; ok {
+			panic(fmt.Errorf("duplicate %s cmap", platEnc))
+		}
+		tablesDone[platEnc] = true
+		common.Log.Debug("ParseCmap: table %d: version=%d platformID=%d encodingID=%d offset=%d",
+			j, version, platformID, encodingID, offset)
+		if platformID == 3 && encodingID == 1 {
+			// (3,1) subtable. Windows Unicode.
+			// if offset31 != 0 {
+			// 	panic("duplicate (3,1) cmap")
+			// }
+			offset31 = offset
+		} else /*if platformID == 1 && encodingID == 0*/ {
+			// (1,0) subtable.
+			// if offset10 != 0 {
+			// 	panic("duplicate (1,0) cmap")
+			// }
+			offset10 = offset
+		} /* else {
+			common.Log.Error("unsupported cmap version=%d platformID=%d encodingID=%d offset=%d",
+				version, platformID, encodingID, offset)
+			panic("unsupported cmap version")
+		}*/
+	}
+
+	// Latin font support based on (3,1) table encoding.
+	if offset31 != 0 {
+		err = t.parseCmapSubtable31(offset31)
+		if err != nil {
+			return
+		}
+	}
+
+	// Many non-Latin fonts (including asian fonts) use subtable (1,0).
+
+	if offset10 != 0 {
+		fmt.Printf("Offset 10: %d\n", offset10)
+		err = t.parseCmapVersion(offset10)
+		if err != nil {
+			return
+		}
+	}
+
+	return
+}
+
 func (t *ttfParser) parseCmapVersion(offset int64) error {
 	common.Log.Debug("parseCmapVersion: offset=%d", offset)
 
@@ -561,64 +631,6 @@ func (t *ttfParser) parseCmapFormat6() error {
 	}
 
 	return nil
-}
-
-// ParseCmap parses the cmap table in a TrueType font.
-func (t *ttfParser) ParseCmap() (err error) {
-	var offset int64
-	if err = t.Seek("cmap"); err != nil {
-		panic(err)
-		return
-	}
-	common.Log.Debug("ParseCmap")
-	version := t.ReadUShort()
-	numTables := int(t.ReadUShort())
-	offset10 := int64(0)
-	offset31 := int64(0)
-	for j := 0; j < numTables; j++ {
-		platformID := t.ReadUShort()
-		encodingID := t.ReadUShort()
-		offset = int64(t.ReadULong())
-		common.Log.Debug("ParseCmap: table %d: version=%d platformID=%d encodingID=%d offset=%d",
-			j, version, platformID, encodingID, offset)
-		if platformID == 3 && encodingID == 1 {
-			// (3,1) subtable. Windows Unicode.
-			if offset31 != 0 {
-				panic("duplicate (3,1) cmap")
-			}
-			offset31 = offset
-		} else if platformID == 1 && encodingID == 0 {
-			// (1,0) subtable.
-			if offset10 != 0 {
-				panic("duplicate (1,0) cmap")
-			}
-			offset10 = offset
-		} else {
-			common.Log.Error("unsupported cmap version=%d platformID=%d encodingID=%d offset=%d",
-				version, platformID, encodingID, offset)
-			// panic("unsupported cmap version")
-		}
-	}
-
-	// Latin font support based on (3,1) table encoding.
-	if offset31 != 0 {
-		err = t.parseCmapSubtable31(offset31)
-		if err != nil {
-			return
-		}
-	}
-
-	// Many non-Latin fonts (including asian fonts) use subtable (1,0).
-
-	if offset10 != 0 {
-		fmt.Printf("Offset 10: %d\n", offset10)
-		err = t.parseCmapVersion(offset10)
-		if err != nil {
-			return
-		}
-	}
-
-	return
 }
 
 func (t *ttfParser) ParseName() (err error) {
