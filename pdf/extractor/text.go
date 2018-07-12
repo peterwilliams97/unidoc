@@ -63,14 +63,26 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 
 			switch operand {
 			case "q":
-				common.Log.Debug("Save font %s\n->%s\n%s",
-					fontStack.peek().Tf, state.Tf, fontStack.String())
-				fontStack.push(state)
+				if !fontStack.empty() {
+					common.Log.Debug("Save font state: %s\n%s",
+						fontStack.peek(), fontStack.String())
+					fontStack.push(fontStack.peek())
+				}
+				if state.Tf != nil {
+					common.Log.Debug("Save font state: %s\n->%s\n%s",
+						fontStack.peek(), state.Tf, fontStack.String())
+					fontStack.push(state.Tf)
+				}
 			case "Q":
-				if len(fontStack) >= 1 {
-					common.Log.Debug("Restore font %s\n->%s\n%s",
-						state.Tf, fontStack.peek().Tf, fontStack.String())
-					state = fontStack.pop()
+				if !fontStack.empty() {
+					common.Log.Debug("Restore font state: %s\n->%s\n%s",
+						fontStack.peek(), fontStack.get(-2), fontStack.String())
+					fontStack.pop()
+				}
+				if len(fontStack) >= 2 {
+					common.Log.Debug("Restore font state: %s\n->%s\n%s",
+						state.Tf, fontStack.peek(), fontStack.String())
+					state.Tf = fontStack.pop()
 				}
 
 			case "BT": // Begin text
@@ -80,7 +92,7 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 				if to != nil {
 					common.Log.Debug("BT called while in a text object")
 				}
-				to = newTextObject(e, gs, &state)
+				to = newTextObject(e, gs, &state, &fontStack)
 			case "ET": // End Text
 				*textList = append(*textList, to.Texts...)
 				to = nil
@@ -370,6 +382,11 @@ func (to *TextObject) setFont(name string, size float64) error {
 	font, err := to.getFont(name)
 	if err == nil {
 		to.State.Tf = font
+		if len(*to.fontStack) == 0 {
+			to.fontStack.push(font)
+		} else {
+			(*to.fontStack)[len(*to.fontStack)-1] = font
+		}
 	} else if err == ErrFontNotSupported {
 		return err
 		// to.State.Tf = nil
@@ -430,39 +447,58 @@ func checkOp(op *contentstream.ContentStreamOperation, to *TextObject, numParams
 	return
 }
 
-type fontStacker []TextState
+type fontStacker []*model.PdfFont
 
 func (fontStack *fontStacker) String() string {
 	parts := []string{"---- font stack"}
-	for i, ts := range *fontStack {
+	for i, font := range *fontStack {
 		s := "<nil>"
-		if ts.Tf != nil {
-			s = ts.Tf.String()
+		if font != nil {
+			s = font.String()
 		}
 		parts = append(parts, fmt.Sprintf("\t%2d: %s", i, s))
 	}
 	return strings.Join(parts, "\n")
 }
 
-func (fontStack *fontStacker) push(textState TextState) {
-	*fontStack = append(*fontStack, textState)
+func (fontStack *fontStacker) push(font *model.PdfFont) {
+	*fontStack = append(*fontStack, font)
 }
 
-func (fontStack *fontStacker) pop() (textState TextState) {
-	if len(*fontStack) < 1 {
+func (fontStack *fontStacker) pop() (font *model.PdfFont) {
+	if fontStack.empty() {
 		return
 	}
-	textState = (*fontStack)[len(*fontStack)-1]
+	font = (*fontStack)[len(*fontStack)-1]
 	*fontStack = (*fontStack)[:len(*fontStack)-1]
 	return
 }
 
-func (fontStack *fontStacker) peek() (textState TextState) {
-	if len(*fontStack) < 1 {
+func (fontStack *fontStacker) peek() (font *model.PdfFont) {
+	if fontStack.empty() {
 		return
 	}
-	textState = (*fontStack)[len(*fontStack)-1]
+	font = (*fontStack)[len(*fontStack)-1]
 	return
+}
+
+func (fontStack *fontStacker) get(idx int) (font *model.PdfFont) {
+	if idx < 0 {
+		idx += fontStack.size()
+	}
+	if idx < 0 || idx > fontStack.size()-1 {
+		return
+	}
+	font = (*fontStack)[idx]
+	return
+}
+
+func (fontStack *fontStacker) empty() bool {
+	return len(*fontStack) == 0
+}
+
+func (fontStack *fontStacker) size() int {
+	return len(*fontStack)
 }
 
 // 9.3 Text State Parameters and Operators (page 243)
@@ -493,9 +529,10 @@ type TextState struct {
 //        | 0         Trise   1 |
 //
 type TextObject struct {
-	e     *Extractor
-	gs    contentstream.GraphicsState
-	State *TextState
+	e         *Extractor
+	gs        contentstream.GraphicsState
+	fontStack *fontStacker
+	State     *TextState
 	// Tm    contentstream.Matrix // Text matrix. For the character pointer.
 	// Tlm   contentstream.Matrix // Text line matrix. For the start of line pointer.
 	Texts []XYText // Text gets written here.
@@ -511,11 +548,13 @@ func newTextState() TextState {
 }
 
 // newTextObject returns a default TextObject
-func newTextObject(e *Extractor, gs contentstream.GraphicsState, state *TextState) *TextObject {
+func newTextObject(e *Extractor, gs contentstream.GraphicsState, state *TextState,
+	fontStack *fontStacker) *TextObject {
 	return &TextObject{
-		e:     e,
-		gs:    gs,
-		State: state,
+		e:         e,
+		gs:        gs,
+		fontStack: fontStack,
+		State:     state,
 		// Tm:    contentstream.IdentityMatrix(),
 		// Tlm:   contentstream.IdentityMatrix(),
 	}
@@ -529,12 +568,14 @@ func (to *TextObject) renderRawText(text string) {
 // renderText emits byte array `data` to the calling program
 func (to *TextObject) renderText(data []byte) (err error) {
 	text := ""
-	if to.State.Tf == nil {
+	if len(*to.fontStack) == 0 {
 		common.Log.Debug("ERROR: No font defined. data=%#q", string(data))
 		text = string(data)
 		err = model.ErrBadText
+		// panic(err)
 	} else {
-		text, err = to.State.Tf.CharcodeBytesToUnicode(data)
+		font := to.fontStack.peek()
+		text, err = font.CharcodeBytesToUnicode(data)
 	}
 	to.Texts = append(to.Texts, XYText{text})
 	return
