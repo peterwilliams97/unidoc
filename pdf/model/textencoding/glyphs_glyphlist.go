@@ -37,6 +37,9 @@ func GlyphToRune(glyph string) (rune, bool) {
 	if r, ok := additionalGlyphlistGlyphToRuneMap[glyph]; ok {
 		return r, true
 	}
+	if r, ok := texGlyphlistGlyphToRuneMap[glyph]; ok {
+		return r, true
+	}
 
 	if glyph == ".notdef" {
 		return '?', true
@@ -9051,4 +9054,19 @@ var additionalGlyphlistGlyphToRuneMap = map[string]rune{ // 120 entries
 	"uniontext":             '\u22c3', // ⋃
 	"vextenddouble":         '\u2225', // ∥
 	"vextendsingle":         '\u2223', // ∣
+}
+
+// Copied from https://tex.stackexchange.com/questions/66300/how-to-fix-missing-or-incorrect-mappings-from-glyphtounicode-tex
+var texGlyphlistGlyphToRuneMap = map[string]rune{
+	// "notsubsetdbl": "\u22D0\u0338",
+	"simequal":    '\u2245',
+	"notsimequal": '\u2247',
+	"uniontext":   '\u22C3',
+	"nelement":    '\u2209',
+	"nequal":      '\u2260',
+	"llbracket":   '\u27E6',
+	"rrbracket":   '\u27E7',
+	// "llparenthesis": 0028 007C
+	// "rrparenthesis": 007C 0029}
+	"colonequal": '\u2254',
 }
