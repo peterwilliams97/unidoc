@@ -53,7 +53,7 @@ func newFontFileFromPdfObject(obj PdfObject) (*fontFile, error) {
 		if subtype == "Type1C" {
 			// XXX: TODO Add Type1C support
 			common.Log.Debug("Type1C fonts are currently not supported")
-			return nil, ErrFontNotSupported
+			return nil, ErrType1CFontNotSupported
 		}
 	}
 

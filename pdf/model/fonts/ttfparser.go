@@ -519,7 +519,8 @@ func (t *ttfParser) ParseCmap() (err error) {
 		offset = int64(t.ReadULong())
 		platEnc := fmt.Sprintf("(%d,%d)", platformID, encodingID)
 		if _, ok := tablesDone[platEnc]; ok {
-			panic(fmt.Errorf("duplicate %s cmap", platEnc))
+			// panic(fmt.Errorf("duplicate %s cmap", platEnc))
+			return errors.New("duplicate  cmap")
 		}
 		tablesDone[platEnc] = true
 		common.Log.Debug("ParseCmap: table %d: version=%d platformID=%d encodingID=%d offset=%d",
@@ -592,6 +593,7 @@ func (t *ttfParser) parseCmapVersion(offset int64) error {
 		return t.parseCmapFormat6()
 	default:
 		common.Log.Debug("ERROR: Unsupported cmap format=%d", format)
+		// return nil // Need this for creator_test.go to pass.
 		return ErrFontNotSupported
 	}
 }
@@ -607,9 +609,9 @@ func (t *ttfParser) parseCmapFormat0() error {
 
 	for code, glyphId := range data {
 		t.rec.Chars[uint16(code)] = uint16(glyphId)
-		if glyphId != 0 {
-			fmt.Printf(" 0>> 0x%02x -> 0x%02x=%c\n", code, glyphId, rune(glyphId))
-		}
+		// if glyphId != 0 {
+		// 	fmt.Printf(" 0>> 0x%02x -> 0x%02x=%c\n", code, glyphId, rune(glyphId))
+		// }
 	}
 	return nil
 }
@@ -625,9 +627,9 @@ func (t *ttfParser) parseCmapFormat6() error {
 	for i := 0; i < entryCount; i++ {
 		glyphId := t.ReadUShort()
 		t.rec.Chars[uint16(i+firstCode)] = glyphId
-		if glyphId != 0 {
-			fmt.Printf(" 6>> 0x%02x -> 0x%02x=%+q\n", i+firstCode, glyphId, rune(glyphId))
-		}
+		// if glyphId != 0 {
+		// 	fmt.Printf(" 6>> 0x%02x -> 0x%02x=%+q\n", i+firstCode, glyphId, rune(glyphId))
+		// }
 	}
 
 	return nil

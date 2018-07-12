@@ -19,4 +19,6 @@ var (
 	ErrTypeCheck                     = errors.New("Type check error")
 	ErrNotSupported                  = errors.New("Feature not currently supported")
 	ErrFontNotSupported              = errors.New("Unsupported font")
+	ErrType1CFontNotSupported        = errors.New("Type1C fonts are not currently supported")
+	ErrTTCmapNotSupported            = errors.New("Unsupported TrueType cmap format")
 )
