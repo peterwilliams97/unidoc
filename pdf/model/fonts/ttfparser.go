@@ -91,7 +91,7 @@ func (rec *TtfType) MakeEncoder() (textencoding.SimpleEncoder, error) {
 		common.Log.Error("Chars=[% 02x]", rec.Chars)
 		panic("no encoding")
 	}
-	return textencoding.NewCustomSimpleTextEncoder(encoding, nil)
+	return textencoding.NewEmbeddedSimpleTextEncoder(encoding, nil)
 }
 
 // TtfType contains metrics of a TrueType font.

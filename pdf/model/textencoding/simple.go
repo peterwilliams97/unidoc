@@ -37,14 +37,15 @@ type SimpleEncoder struct {
 	codeToRune   map[uint16]rune
 }
 
-// NewCustomSimpleTextEncoder returns a SimpleEncoder based on map `encoding` and difference map
+// NewEmbeddedSimpleTextEncoder returns a SimpleEncoder based on map `encoding` and difference map
 // `differences`.
-func NewCustomSimpleTextEncoder(encoding map[uint16]string, differences map[byte]string) (SimpleEncoder, error) {
-	baseName := "custom"
+func NewEmbeddedSimpleTextEncoder(encoding map[uint16]string, differences map[byte]string) (SimpleEncoder, error) {
+	baseName := "embedded"
 	baseEncoding := map[uint16]rune{}
 	// common.Log.Debug("encoding=%#v", encoding)
 	if len(encoding) == 0 {
-		panic("No encoding")
+		return SimpleEncoder{}, errors.New("Empty embedded encoding")
+		// panic("No encoding")
 	}
 	for code, glyph := range encoding {
 		r, ok := GlyphToRune(glyph)

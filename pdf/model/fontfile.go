@@ -150,7 +150,7 @@ func (fontfile *fontFile) parseAsciiPart(data []byte) error {
 		if err != nil {
 			return err
 		}
-		encoder, err := textencoding.NewCustomSimpleTextEncoder(encodings, nil)
+		encoder, err := textencoding.NewEmbeddedSimpleTextEncoder(encodings, nil)
 		if err != nil {
 			// XXX: !@#$ We need to fix all these errors
 			common.Log.Error("UNKNOWN GLYPH: err=%v", err)

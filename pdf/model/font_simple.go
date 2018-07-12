@@ -200,32 +200,25 @@ func (font *pdfFontSimple) addEncoding() error {
 		common.Log.Debug("addEncoding: BaseFont=%q Subtype=%q Encoding=%s (%T)", skeleton.basefont,
 			skeleton.subtype, font.Encoding, font.Encoding)
 
-		// if font.Encoder() == nil {
 		encoder, err := textencoding.NewSimpleTextEncoder(baseEncoder, differences)
 		if err != nil {
 			return err
 		}
 		font.SetEncoder(encoder)
-		// }
 		common.Log.Debug("addEncoding: font.Encoder()=%s", font.Encoder())
 	}
 
-	descriptor := skeleton.fontDescriptor
-	if descriptor != nil {
-		switch skeleton.subtype {
-		case "Type1":
-			// XXX: !@#$ Is this the right order? Do the /Differences need to be reapplied?
-			if descriptor.fontFile != nil && descriptor.fontFile.encoder != nil {
-				common.Log.Debug("Using fontFile")
-				font.SetEncoder(descriptor.fontFile.encoder)
-			}
-		case "TrueType":
-			// if descriptor.fontFile2 != nil && descriptor.fontFile2.Chars != nil {
-			// 	common.Log.Debug("Using fontFile2")
-			// 	encoder := textencoding.NewTrueTypeFontEncoder(descriptor.fontFile2.Chars)
-			// 	font.SetEncoder(encoder)
-			// }
-			if font.Encoder() == nil {
+	if font.Encoder() == nil {
+		descriptor := skeleton.fontDescriptor
+		if descriptor != nil {
+			switch skeleton.subtype {
+			case "Type1":
+				// XXX: !@#$ Is this the right order? Do the /Differences need to be reapplied?
+				if descriptor.fontFile != nil && descriptor.fontFile.encoder != nil {
+					common.Log.Debug("Using fontFile")
+					font.SetEncoder(descriptor.fontFile.encoder)
+				}
+			case "TrueType":
 				if descriptor.fontFile2 != nil {
 					common.Log.Debug("Using FontFile2")
 					encoder, err := descriptor.fontFile2.MakeEncoder()
