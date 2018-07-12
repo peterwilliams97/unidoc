@@ -163,7 +163,7 @@ func newPdfFontFromPdfObject(fontObj PdfObject, allowType0 bool) (*PdfFont, erro
 //   conforming writers, instead of using a simple font, shall use a Type 0 font with an Identity-H
 //   encoding and use the glyph indices as character codes, as described following Table 118.
 func (font PdfFont) CharcodeBytesToUnicode(data []byte) (string, error) {
-	common.Log.Debug("showText: data=%+v=%#q", data, data)
+	common.Log.Debug("showText: data=[% 02x]=%#q", data, data)
 	if font.toUnicodeCmap != nil {
 		unicode, ok := font.toUnicodeCmap.CharcodeBytesToUnicode(data)
 		if ok {
@@ -515,13 +515,9 @@ func (descriptor *PdfFontDescriptor) String() string {
 	}
 	if descriptor.fontFile != nil {
 		parts = append(parts, descriptor.fontFile.String())
-	} else {
-		parts = append(parts, fmt.Sprintf("FontFile=%t", descriptor.FontFile2 != nil))
 	}
 	if descriptor.fontFile2 != nil {
 		parts = append(parts, descriptor.fontFile2.String())
-	} else {
-		parts = append(parts, fmt.Sprintf("FontFile2=%t", descriptor.FontFile2 != nil))
 	}
 	parts = append(parts, fmt.Sprintf("FontFile3=%t", descriptor.FontFile3 != nil))
 

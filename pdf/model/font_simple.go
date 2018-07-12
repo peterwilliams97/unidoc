@@ -186,21 +186,28 @@ func newSimpleFontFromPdfObject(obj PdfObject, skeleton *fontSkeleton, std14 boo
 // The order of precedence is important
 func (font *pdfFontSimple) addEncoding() error {
 	skeleton := font.fontSkeleton
+	var baseEncoder string
+	var differences map[byte]string
+	var err error
+	if font.Encoding != nil {
+		// !@#$ Stop setting default encoding in getFontEncoding XXX
+		baseEncoder, differences, err = getFontEncoding(font.Encoding)
+		if err != nil {
+			common.Log.Debug("ERROR: BaseFont=%q Subtype=%q Encoding=%s (%T) err=%v", skeleton.basefont,
+				skeleton.subtype, font.Encoding, font.Encoding, err)
+			return err
+		}
+		common.Log.Debug("addEncoding: BaseFont=%q Subtype=%q Encoding=%s (%T)", skeleton.basefont,
+			skeleton.subtype, font.Encoding, font.Encoding)
 
-	// !@#$ Stop setting default encoding in getFontEncoding XXX
-	baseEncoder, differences, err := getFontEncoding(font.Encoding)
-	if err != nil {
-		common.Log.Debug("ERROR: BaseFont=%q Subtype=%q Encoding=%s (%T) err=%v", skeleton.basefont,
-			skeleton.subtype, font.Encoding, font.Encoding, err)
-		return err
-	}
-
-	if font.Encoder() == nil {
+		// if font.Encoder() == nil {
 		encoder, err := textencoding.NewSimpleTextEncoder(baseEncoder, differences)
 		if err != nil {
 			return err
 		}
 		font.SetEncoder(encoder)
+		// }
+		common.Log.Debug("addEncoding: font.Encoder()=%s", font.Encoder())
 	}
 
 	descriptor := skeleton.fontDescriptor
@@ -218,13 +225,15 @@ func (font *pdfFontSimple) addEncoding() error {
 			// 	encoder := textencoding.NewTrueTypeFontEncoder(descriptor.fontFile2.Chars)
 			// 	font.SetEncoder(encoder)
 			// }
-			if descriptor.fontFile2 != nil {
-				common.Log.Debug("Using fontFile2")
-				encoder, err := descriptor.fontFile2.MakeEncoder()
-				if err != nil {
-					return err
+			if font.Encoder() == nil {
+				if descriptor.fontFile2 != nil {
+					common.Log.Debug("Using FontFile2")
+					encoder, err := descriptor.fontFile2.MakeEncoder()
+					if err != nil {
+						return err
+					}
+					font.SetEncoder(encoder)
 				}
-				font.SetEncoder(encoder)
 			}
 		}
 	}

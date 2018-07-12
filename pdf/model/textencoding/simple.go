@@ -43,11 +43,15 @@ func NewCustomSimpleTextEncoder(encoding map[uint16]string, differences map[byte
 	baseName := "custom"
 	baseEncoding := map[uint16]rune{}
 	// common.Log.Debug("encoding=%#v", encoding)
+	if len(encoding) == 0 {
+		panic("No encoding")
+	}
 	for code, glyph := range encoding {
 		r, ok := GlyphToRune(glyph)
 		if !ok {
 			common.Log.Debug("ERROR: Unknown glyph. %q", glyph)
 			// return SimpleEncoder{}, ErrTypeError
+			continue
 		}
 		baseEncoding[code] = r
 	}

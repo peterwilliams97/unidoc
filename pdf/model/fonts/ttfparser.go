@@ -65,16 +65,25 @@ func (rec *TtfType) MakeEncoder() (textencoding.SimpleEncoder, error) {
 	//        }
 	encoding := map[uint16]string{}
 	for code := uint16(0); code <= 256; code++ {
-		gid := rec.Chars[code]
+		gid, ok := rec.Chars[code]
+		if !ok {
+			continue
+		}
 		glyph := ""
 		if 0 <= gid && int(gid) < len(rec.GlyphNames) {
 			glyph = rec.GlyphNames[gid]
-			encoding[code] = glyph
-		} /*else {
-			common.Log.Debug("No match for code=%d gid=%d", code, gid)
-			glyph = fmt.Sprintf("%d", gid)
-		}*/
-
+			// encoding[code] = glyph
+		} else {
+			// common.Log.Debug("No match for code=%d gid=%d", code, gid)
+			glyph = string(rune(gid))
+		}
+		encoding[code] = glyph
+		fmt.Printf(" *>> code=%d gid=0x%04x glyph=%q\n", code, gid, glyph)
+	}
+	if len(encoding) == 0 {
+		common.Log.Error("rec=%s", rec)
+		common.Log.Error("Chars=[% 02x]", rec.Chars)
+		panic("no encoding")
 	}
 	return textencoding.NewCustomSimpleTextEncoder(encoding, nil)
 }
@@ -102,9 +111,9 @@ type TtfType struct {
 
 func (ttf *TtfType) String() string {
 	return fmt.Sprintf("FONT_FILE2{%#q Embeddable=%t UnitsPerEm=%d Bold=%t ItalicAngle=%f "+
-		"CapHeight=%d Chars=%d}",
+		"CapHeight=%d Chars=%d GlyphNames=%d}",
 		ttf.PostScriptName, ttf.Embeddable, ttf.UnitsPerEm, ttf.Bold, ttf.ItalicAngle,
-		ttf.CapHeight, len(ttf.Chars))
+		ttf.CapHeight, len(ttf.Chars), len(ttf.GlyphNames))
 }
 
 // ttfParser describes a TrueType font file.
@@ -182,8 +191,19 @@ func (t *ttfParser) Parse() (TtfRec TtfType, err error) {
 	if err != nil {
 		return
 	}
+	/*
+	   if (stream.readTag().equals("OTTO"))
+	      {
+	          parser = new OTFParser(false, true);
+	      }
+	      else
+	      {
+	          parser = new TTFParser(false, true);
+	      }
+	*/
 	if version == "OTTO" {
 		err = fmt.Errorf("fonts based on PostScript outlines are not supported")
+		panic("OTTO")
 		return
 	}
 	// XXX: !@#$ Not sure what to do here. Have seen version="true"
@@ -223,7 +243,7 @@ func describeTables(tables map[string]uint32) string {
 	for tag := range tables {
 		tags = append(tags, tag)
 	}
-	sort.Strings(tags)
+	sort.Slice(tags, func(i, j int) bool { return tables[tags[i]] < tables[tags[j]] })
 	parts := []string{fmt.Sprintf("TrueType tables: %d", len(tables))}
 	for _, tag := range tags {
 		parts = append(parts, fmt.Sprintf("\t%q %5d", tag, tables[tag]))
@@ -507,17 +527,18 @@ func (t *ttfParser) parseCmapVersion(offset int64) error {
 }
 
 func (t *ttfParser) parseCmapFormat0() error {
-
 	dataStr, err := t.ReadStr(256)
 	if err != nil {
 		return err
 	}
 	data := []byte(dataStr)
+	common.Log.Debug("parseCmapFormat0: %s\ndataStr=%+q\ndata=[% 02x]",
+		t.rec.String(), dataStr, data)
 
 	for code, glyphId := range data {
 		t.rec.Chars[uint16(code)] = uint16(glyphId)
 		if glyphId != 0 {
-			fmt.Printf("\t0x%02x -> 0x%02x=%c\n", code, glyphId, rune(glyphId))
+			fmt.Printf(" 0>> 0x%02x -> 0x%02x=%c\n", code, glyphId, rune(glyphId))
 		}
 	}
 	return nil
@@ -528,11 +549,14 @@ func (t *ttfParser) parseCmapFormat6() error {
 	firstCode := int(t.ReadUShort())
 	entryCount := int(t.ReadUShort())
 
+	common.Log.Debug("parseCmapFormat6: %s firstCode=%d entryCount=%d",
+		t.rec.String(), firstCode, entryCount)
+
 	for i := 0; i < entryCount; i++ {
 		glyphId := t.ReadUShort()
 		t.rec.Chars[uint16(i+firstCode)] = glyphId
 		if glyphId != 0 {
-			fmt.Printf("\t0x%02x -> 0x%02x=%c\n", i+firstCode, glyphId, rune(glyphId))
+			fmt.Printf(" 6>> 0x%02x -> 0x%02x=%+q\n", i+firstCode, glyphId, rune(glyphId))
 		}
 	}
 
@@ -570,7 +594,9 @@ func (t *ttfParser) ParseCmap() (err error) {
 			}
 			offset10 = offset
 		} else {
-			panic("unsupported cmap version")
+			common.Log.Error("unsupported cmap version=%d platformID=%d encodingID=%d offset=%d",
+				version, platformID, encodingID, offset)
+			// panic("unsupported cmap version")
 		}
 	}
 
