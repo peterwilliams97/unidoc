@@ -25,6 +25,7 @@ package fonts
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -88,7 +89,7 @@ func (rec *TtfType) MakeEncoder() (textencoding.SimpleEncoder, error) {
 	if len(encoding) == 0 {
 		common.Log.Error("rec=%s", rec)
 		common.Log.Error("Chars=[% 02x]", rec.Chars)
-		panic("no encoding")
+		return textencoding.SimpleEncoder{}, errors.New("no encoding")
 	}
 	return textencoding.NewEmbeddedSimpleTextEncoder(encoding, nil)
 }
