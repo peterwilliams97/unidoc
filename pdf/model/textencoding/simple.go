@@ -24,7 +24,7 @@ import (
 )
 
 var (
-	ErrTypeError = errors.New("Type check error")
+	ErrTypeError = errors.New("type check error")
 )
 
 // SimpleEncoder represents a 1 byte encoding
