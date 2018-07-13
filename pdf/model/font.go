@@ -162,7 +162,7 @@ func newPdfFontFromPdfObject(fontObj PdfObject, allowType0 bool) (*PdfFont, erro
 //   "Encodings for TrueType Fonts". Since this process sometimes produces ambiguous results,
 //   conforming writers, instead of using a simple font, shall use a Type 0 font with an Identity-H
 //   encoding and use the glyph indices as character codes, as described following Table 118.
-func (font PdfFont) CharcodeBytesToUnicode(data []byte) (string, int, int, error) {
+func (font PdfFont) CharcodeBytesToUnicode(data []byte) (string, int, int) {
 	common.Log.Debug("showText: data=[% 02x]=%#q", data, data)
 
 	charcodes := make([]uint16, 0, len(data)+len(data)%2)
@@ -210,15 +210,14 @@ func (font PdfFont) CharcodeBytesToUnicode(data []byte) (string, int, int, error
 		}
 	}
 
-	if numMisses == 0 {
-		return strings.Join(charstrings, ""), len(charcodes), numMisses, nil
+	if numMisses != 0 {
+		common.Log.Debug("ERROR: Couldn't convert to unicode. Using input. data=%#q=[% 02x]\n"+
+			"\tnumChars=%d numMisses=%d\n"+
+			"\tfont=%s",
+			string(data), data, len(charcodes), numMisses, font)
 	}
-	common.Log.Debug("ERROR: Couldn't convert to unicode. Using input. data=%#q=[% 02x]\n"+
-		"\tnumChars=%d numMisses=%d\n"+
-		"\tfont=%s",
-		string(data), data, len(charcodes), numMisses, font)
 
-	return string(data), len(charcodes), numMisses, ErrBadText
+	return strings.Join(charstrings, ""), len(charcodes), numMisses
 }
 
 // ToPdfObject converts the PdfFont object to its PDF representation.

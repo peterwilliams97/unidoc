@@ -125,9 +125,7 @@ func (e *Extractor) ExtractXYText() (*TextList, int, int, error) {
 					common.Log.Debug("ERROR: err=%v", err)
 					return err
 				}
-				err = to.showText(charcodes)
-				err = to.swallowErrors(err)
-				return err
+				return to.showText(charcodes)
 			case "TJ": // Show text with adjustable spacing
 				if ok, err := checkOp(op, to, 1, true); !ok {
 					common.Log.Debug("ERROR: err=%v", err)
@@ -138,9 +136,7 @@ func (e *Extractor) ExtractXYText() (*TextList, int, int, error) {
 					common.Log.Debug("ERROR: err=%v", err)
 					return err
 				}
-				err = to.showTextAdjusted(args)
-				err = to.swallowErrors(err)
-				return err
+				return to.showTextAdjusted(args)
 			case "'": // Move to next line and show text
 				if ok, err := checkOp(op, to, 1, true); !ok {
 					common.Log.Debug("ERROR: err=%v", err)
@@ -269,10 +265,8 @@ func (e *Extractor) ExtractXYText() (*TextList, int, int, error) {
 	// }
 	if err != nil {
 		common.Log.Error("ERROR: Processing: err=%v", err)
-		return textList, state.numChars, state.numMisses, err
 	}
-
-	return textList, state.numChars, state.numMisses, state.err
+	return textList, state.numChars, state.numMisses, err
 }
 
 //
@@ -522,7 +516,6 @@ type TextState struct {
 	// For debugging
 	numChars  int
 	numMisses int
-	err       error
 }
 
 // 9.4.1 General (page 248)
@@ -574,20 +567,6 @@ var nonErrors = map[error]bool{
 	model.ErrBadText:    true,
 }
 
-// swallowErrors
-func (to *TextObject) swallowErrors(err error) error {
-	if err == nil {
-		return nil
-	}
-	if _, ok := nonErrors[err]; !ok {
-		return err
-	}
-	if to.State.err == nil {
-		to.State.err = err
-	}
-	return nil
-}
-
 // renderRawText writes `text` directly to the extracted text
 func (to *TextObject) renderRawText(text string) {
 	to.Texts = append(to.Texts, XYText{text})
@@ -603,8 +582,8 @@ func (to *TextObject) renderText(data []byte) (err error) {
 		// panic(err)
 	} else {
 		font := to.fontStack.peek()
-		numChars, numMisses := 0, 0
-		text, numChars, numMisses, err = font.CharcodeBytesToUnicode(data)
+		var numChars, numMisses int
+		text, numChars, numMisses = font.CharcodeBytesToUnicode(data)
 		to.State.numChars += numChars
 		to.State.numMisses += numMisses
 	}
