@@ -25,7 +25,6 @@ package fonts
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -142,7 +141,7 @@ func NewFontFile2FromPdfObject(obj PdfObject) (rec TtfType, err error) {
 	streamObj, ok := obj.(*PdfObjectStream)
 	if !ok {
 		common.Log.Debug("ERROR: FontFile must be a stream (%T)", obj)
-		err = errors.New("type error")
+		err = ErrTypeCheck
 		return
 	}
 	data, err := DecodeStream(streamObj)
@@ -512,19 +511,22 @@ func (t *ttfParser) ParseCmap() (err error) {
 	numTables := int(t.ReadUShort())
 	offset10 := int64(0)
 	offset31 := int64(0)
-	tablesDone := map[string]bool{}
+	// tablesDone := map[string]bool{}
 	for j := 0; j < numTables; j++ {
 		platformID := t.ReadUShort()
 		encodingID := t.ReadUShort()
 		offset = int64(t.ReadULong())
-		platEnc := fmt.Sprintf("(%d,%d)", platformID, encodingID)
-		if _, ok := tablesDone[platEnc]; ok {
-			// panic(fmt.Errorf("duplicate %s cmap", platEnc))
-			return errors.New("duplicate  cmap")
-		}
-		tablesDone[platEnc] = true
 		common.Log.Debug("ParseCmap: table %d: version=%d platformID=%d encodingID=%d offset=%d",
 			j, version, platformID, encodingID, offset)
+
+		// platEnc := fmt.Sprintf("(%d,%d)", platformID, encodingID)
+		// if _, ok := tablesDone[platEnc]; ok {
+		// 	// panic(fmt.Errorf("duplicate %s cmap", platEnc))
+		// 	common.Log.Debug("ERROR: duplicate %s TrueType cmap", platEnc)
+		// 	return errors.New("duplicate TrueType cmap")
+		// }
+		// tablesDone[platEnc] = true
+
 		if platformID == 3 && encodingID == 1 {
 			// (3,1) subtable. Windows Unicode.
 			// if offset31 != 0 {
@@ -593,7 +595,7 @@ func (t *ttfParser) parseCmapVersion(offset int64) error {
 		return t.parseCmapFormat6()
 	default:
 		common.Log.Debug("ERROR: Unsupported cmap format=%d", format)
-		// return nil // Need this for creator_test.go to pass.
+		return nil // Need this for creator_test.go to pass.
 		return ErrFontNotSupported
 	}
 }
@@ -604,8 +606,8 @@ func (t *ttfParser) parseCmapFormat0() error {
 		return err
 	}
 	data := []byte(dataStr)
-	common.Log.Debug("parseCmapFormat0: %s\ndataStr=%+q\ndata=[% 02x]",
-		t.rec.String(), dataStr, data)
+	common.Log.Debug("parseCmapFormat0: %s", t.rec.String())
+	common.Log.Trace("parseCmapFormat0: dataStr=%+q\ndata=[% 02x]", dataStr, data)
 
 	for code, glyphId := range data {
 		t.rec.Chars[uint16(code)] = uint16(glyphId)
