@@ -34,7 +34,7 @@ func TestTextExtraction1(t *testing.T) {
 	e := Extractor{}
 	e.contents = testContents1
 
-	s, err := e.ExtractText()
+	s, _, _, err := e.ExtractText()
 	if err != nil {
 		t.Errorf("Error extracting text: %v", err)
 		return

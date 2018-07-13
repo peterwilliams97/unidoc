@@ -200,16 +200,16 @@ func (p *Paragraph) Height() float64 {
 func (p *Paragraph) getTextWidth() float64 {
 	w := float64(0.0)
 
-	for _, rune := range p.text {
-		glyph, found := p.textFont.Encoder().RuneToGlyph(rune)
+	for _, r := range p.text {
+		glyph, found := p.textFont.Encoder().RuneToGlyph(r)
 		if !found {
-			common.Log.Debug("Error! Glyph not found for rune: %s\n", rune)
+			common.Log.Debug("Error! Glyph not found for rune: %q (%q)", r, r)
 			return -1 // XXX/FIXME: return error.
 		}
 
 		metrics, found := p.textFont.GetGlyphCharMetrics(glyph)
 		if !found {
-			common.Log.Debug("Glyph char metrics not found! %s\n", glyph)
+			common.Log.Debug("Glyph char metrics not found! %q", glyph)
 			return -1 // XXX/FIXME: return error.
 		}
 		w += p.fontSize * metrics.Wx
@@ -237,7 +237,7 @@ func (p *Paragraph) wrapText() error {
 	for _, val := range runes {
 		glyph, found := p.textFont.Encoder().RuneToGlyph(val)
 		if !found {
-			common.Log.Debug("Error! Glyph not found for rune: %v\n", val)
+			common.Log.Debug("Error! Glyph not found for rune: %v", val)
 			return errors.New("Glyph not found for rune") // XXX/FIXME: return error.
 		}
 

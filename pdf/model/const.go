@@ -16,6 +16,5 @@ var (
 	ErrRangeError               = errors.New("Range check error")
 	ErrEncrypted                = errors.New("File needs to be decrypted first")
 	ErrBadText                  = errors.New("Could not decode text")
-	ErrBadTextToUnicode         = errors.New("Could not decode text (ToUnicode)")
 	ErrNoFont                   = errors.New("Font not defined")
 )

@@ -84,7 +84,8 @@ func (cmap *CMap) String() string {
 		parts = append(parts, fmt.Sprintf("codespaces:%d", len(cmap.codespaces)))
 	}
 	if len(cmap.codeToUnicode) > 0 {
-		parts = append(parts, fmt.Sprintf("codeToUnicode:%d", len(cmap.codeToUnicode)))
+		parts = append(parts, fmt.Sprintf("codeToUnicode:%d %+v",
+			len(cmap.codeToUnicode), cmap.codeToUnicode))
 	}
 	return fmt.Sprintf("CMAP{%#q %s}", cmap.name, strings.Join(parts, " "))
 }
@@ -144,48 +145,64 @@ func (cmap *CMap) Type() int {
 
 const (
 	// MissingCodeRune replaces runes that can't be decoded.
-	MissingCodeRune = '?'
+	// MissingCodeRune = '?'
+	MissingCodeRune = '\ufffd' // �
 	// MissingCodeString replaces strings that can't be decoded.
-	MissingCodeString = "?"
+	// MissingCodeString = "?"
+	MissingCodeString = "\ufffd" // �
 )
 
 // CharcodeBytesToUnicode converts a byte array of charcodes to a unicode string representation.
 // It also returns a bool flag to tell if the conversion was successful.
 // NOTE: This only works for ToUnicode cmaps
-func (cmap *CMap) CharcodeBytesToUnicode(data []byte) (string, bool) {
+func (cmap *CMap) CharcodeBytesToUnicode(data []byte) (string, int) {
 	charcodes, matched := cmap.bytesToCharcodes(data)
 	if !matched {
 		common.Log.Debug("ERROR: CharcodeBytesToUnicode. Not in codespaces. data=[% 02x] cmap=%s",
 			data, cmap)
-		return "", false
+		return "", 0
 	}
 
 	parts := []string{}
+	missing := []CharCode{}
 	for _, code := range charcodes {
 		s, ok := cmap.codeToUnicode[code]
 		if !ok {
-			common.Log.Debug("ERROR: CharcodeBytesToUnicode. Not in map.\n"+
-				"\tdata=[% 02x]=%#q\n"+
-				"\tcharcodes=[% 02x]\n"+
-				"\tcmap=%s",
-				data, string(data), charcodes, cmap)
-			return "", false
+			missing = append(missing, code)
+			s = MissingCodeString
 		}
 		parts = append(parts, s)
 	}
-	return strings.Join(parts, ""), true
+	unicode := strings.Join(parts, "")
+	if len(missing) > 0 {
+		common.Log.Debug("ERROR: CharcodeBytesToUnicode. Not in map.\n"+
+			"\tdata=[% 02x]=%#q\n"+
+			"\tcharcodes=%02x\n"+
+			"\tmissing=%d %02x\n"+
+			"\tunicode=`%s`\n"+
+			"\tcmap=%s",
+			data, string(data), charcodes, len(missing), missing, unicode, cmap)
+	}
+	return unicode, len(missing)
 }
 
-// CharcodeToUnicode converts a single character code `code ` to a unicode string.
-// If code is not in the unicode map, "?" is returned
+// CharcodeToUnicode converts a single character code `code` to a unicode string.
+// If `code` is not in the unicode map, "?" is returned
 // Note that CharcodeBytesToUnicode is typically more efficient.
 func (cmap *CMap) CharcodeToUnicode(code CharCode) string {
+	s, _ := cmap.CharcodeToUnicode2(code)
+	return s
+}
+
+// CharcodeToUnicode2 converts a single character code `code` to a unicode string.
+// The bool value is set to true if `code` is in the unicode map,
+func (cmap *CMap) CharcodeToUnicode2(code CharCode) (string, bool) {
 	if s, ok := cmap.codeToUnicode[code]; ok {
-		return s
+		return s, true
 	}
 	common.Log.Debug("ERROR: CharcodeToUnicode could not convert code=0x%04x. cmap=%s. Returning %q",
 		code, cmap, MissingCodeString)
-	return MissingCodeString
+	return MissingCodeString, false
 }
 
 // bytesToCharcodes attempts to convert the entire byte array `data` to a list of character codes

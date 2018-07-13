@@ -80,7 +80,7 @@ func (rec *TtfType) MakeEncoder() (textencoding.SimpleEncoder, error) {
 		}
 		encoding[code] = glyph
 		if gid != 0 || !shownZero {
-			fmt.Printf(" *>> code=%d gid=0x%04x glyph=%q\n", code, gid, glyph)
+			// fmt.Printf(" *>> code=%d gid=0x%04x glyph=%q\n", code, gid, glyph)
 		}
 		if gid == 0 {
 			shownZero = true
@@ -555,7 +555,7 @@ func (t *ttfParser) ParseCmap() (err error) {
 	// Many non-Latin fonts (including asian fonts) use subtable (1,0).
 
 	if offset10 != 0 {
-		fmt.Printf("Offset 10: %d\n", offset10)
+		// fmt.Printf("Offset10: %d\n", offset10)
 		err = t.parseCmapVersion(offset10)
 		if err != nil {
 			return

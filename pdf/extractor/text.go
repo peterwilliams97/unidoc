@@ -570,13 +570,11 @@ func newTextObject(e *Extractor, gs contentstream.GraphicsState, state *TextStat
 }
 
 var nonErrors = map[error]bool{
-	// model.ErrUnsupportedFont: true,
-	ErrFontNotSupported:       true,
-	model.ErrBadText:          true,
-	model.ErrBadTextToUnicode: true,
+	ErrFontNotSupported: true,
+	model.ErrBadText:    true,
 }
 
-// swallowErrorst writes `text` directly to the extracted text
+// swallowErrors
 func (to *TextObject) swallowErrors(err error) error {
 	if err == nil {
 		return nil
