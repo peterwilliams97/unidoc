@@ -26,16 +26,16 @@ import (
 // Takes into account character encoding via CMaps in the PDF file.
 // The text is processed linearly e.g. in the order in which it appears. A best effort is done to
 // add spaces and newlines.
-func (e *Extractor) ExtractText() (string, error) {
-	textList, err := e.ExtractXYText()
+func (e *Extractor) ExtractText() (string, int, int, error) {
+	textList, numChars, numMisses, err := e.ExtractXYText()
 	if err != nil {
-		return "", err
+		return "", numChars, numMisses, err
 	}
-	return textList.ToText(), nil
+	return textList.ToText(), numChars, numMisses, nil
 }
 
 // ExtractXYText returns the text contents of `e` as a TextList.
-func (e *Extractor) ExtractXYText() (*TextList, error) {
+func (e *Extractor) ExtractXYText() (*TextList, int, int, error) {
 	textList := &TextList{}
 	state := newTextState()
 	fontStack := fontStacker{}
@@ -46,7 +46,7 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 	operations, err := cstreamParser.Parse()
 	if err != nil {
 		common.Log.Debug("ExtractXYText: parse failed. err=%v", err)
-		return textList, err
+		return textList, state.numChars, state.numMisses, err
 	}
 
 	// fmt.Println("========================= xxx =========================")
@@ -59,7 +59,7 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 			resources *model.PdfPageResources) error {
 
 			operand := op.Operand
-			common.Log.Debug("++Operand: %+v", op)
+			common.Log.Trace("++Operand: %+v", op)
 
 			switch operand {
 			case "q":
@@ -125,7 +125,9 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 					common.Log.Debug("ERROR: err=%v", err)
 					return err
 				}
-				return to.showText(charcodes)
+				err = to.showText(charcodes)
+				err = to.swallowErrors(err)
+				return err
 			case "TJ": // Show text with adjustable spacing
 				if ok, err := checkOp(op, to, 1, true); !ok {
 					common.Log.Debug("ERROR: err=%v", err)
@@ -136,7 +138,9 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 					common.Log.Debug("ERROR: err=%v", err)
 					return err
 				}
-				return to.showTextAdjusted(args)
+				err = to.showTextAdjusted(args)
+				err = to.swallowErrors(err)
+				return err
 			case "'": // Move to next line and show text
 				if ok, err := checkOp(op, to, 1, true); !ok {
 					common.Log.Debug("ERROR: err=%v", err)
@@ -265,10 +269,10 @@ func (e *Extractor) ExtractXYText() (*TextList, error) {
 	// }
 	if err != nil {
 		common.Log.Error("ERROR: Processing: err=%v", err)
-		return textList, err
+		return textList, state.numChars, state.numMisses, err
 	}
 
-	return textList, nil
+	return textList, state.numChars, state.numMisses, state.err
 }
 
 //
@@ -514,6 +518,11 @@ type TextState struct {
 	// Tmode RenderMode     // Text rendering mode
 	// Trise float64        // Text rise. Unscaled text space units. Set by Ts
 	Tf *model.PdfFont // Text font
+
+	// For debugging
+	numChars  int
+	numMisses int
+	err       error
 }
 
 // 9.4.1 General (page 248)
@@ -560,6 +569,27 @@ func newTextObject(e *Extractor, gs contentstream.GraphicsState, state *TextStat
 	}
 }
 
+var nonErrors = map[error]bool{
+	// model.ErrUnsupportedFont: true,
+	ErrFontNotSupported:       true,
+	model.ErrBadText:          true,
+	model.ErrBadTextToUnicode: true,
+}
+
+// swallowErrorst writes `text` directly to the extracted text
+func (to *TextObject) swallowErrors(err error) error {
+	if err == nil {
+		return nil
+	}
+	if _, ok := nonErrors[err]; !ok {
+		return err
+	}
+	if to.State.err == nil {
+		to.State.err = err
+	}
+	return nil
+}
+
 // renderRawText writes `text` directly to the extracted text
 func (to *TextObject) renderRawText(text string) {
 	to.Texts = append(to.Texts, XYText{text})
@@ -571,11 +601,14 @@ func (to *TextObject) renderText(data []byte) (err error) {
 	if len(*to.fontStack) == 0 {
 		common.Log.Debug("ERROR: No font defined. data=%#q", string(data))
 		text = string(data)
-		err = model.ErrBadText
+		err = model.ErrNoFont
 		// panic(err)
 	} else {
 		font := to.fontStack.peek()
-		text, err = font.CharcodeBytesToUnicode(data)
+		numChars, numMisses := 0, 0
+		text, numChars, numMisses, err = font.CharcodeBytesToUnicode(data)
+		to.State.numChars += numChars
+		to.State.numMisses += numMisses
 	}
 	to.Texts = append(to.Texts, XYText{text})
 	return

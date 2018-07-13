@@ -162,12 +162,14 @@ func newPdfFontFromPdfObject(fontObj PdfObject, allowType0 bool) (*PdfFont, erro
 //   "Encodings for TrueType Fonts". Since this process sometimes produces ambiguous results,
 //   conforming writers, instead of using a simple font, shall use a Type 0 font with an Identity-H
 //   encoding and use the glyph indices as character codes, as described following Table 118.
-func (font PdfFont) CharcodeBytesToUnicode(data []byte) (string, error) {
+func (font PdfFont) CharcodeBytesToUnicode(data []byte) (string, int, int, error) {
 	common.Log.Debug("showText: data=[% 02x]=%#q", data, data)
 	if font.toUnicodeCmap != nil {
-		unicode, ok := font.toUnicodeCmap.CharcodeBytesToUnicode(data)
-		if ok {
-			return unicode, nil
+		unicode, numMisses := font.toUnicodeCmap.CharcodeBytesToUnicode(data)
+		if numMisses == 0 {
+			return unicode, len(unicode), numMisses, nil
+		} else {
+			return unicode, len(unicode), numMisses, ErrBadTextToUnicode
 		}
 	}
 	// Fall back to encoding
@@ -189,8 +191,10 @@ func (font PdfFont) CharcodeBytesToUnicode(data []byte) (string, error) {
 			charcodes = append(charcodes, uint16(b))
 		}
 	}
+	numChars, numMisses := 0, 0
 	if encoder := font.Encoder(); encoder != nil {
 		runes := make([]rune, 0, len(charcodes))
+
 		for _, code := range charcodes {
 			r, ok := encoder.CharcodeToRune(code)
 			if !ok {
@@ -198,15 +202,22 @@ func (font PdfFont) CharcodeBytesToUnicode(data []byte) (string, error) {
 					"\tfont=%s\n\tencoding=%s",
 					code, data, data, charcodes, font.isCIDFont(), font, encoder)
 				r = cmap.MissingCodeRune
-				return string(data), ErrBadText
+				numMisses++
+				// return string(data), 0, ErrBadText
 			}
 			runes = append(runes, r)
+			numChars++
 		}
-		return string(runes), nil
+		if numMisses == 0 {
+			return string(runes), numChars, numMisses, nil
+		}
 	}
-	common.Log.Debug("ERROR: Couldn't convert to unicode. Using input. data=%#q=[% 02x] font=%s",
-		string(data), data, font)
-	return string(data), ErrBadText
+	common.Log.Debug("ERROR: Couldn't convert to unicode. Using input. data=%#q=[% 02x]\n"+
+		"\tnumChars=%d numMisses=%d\n"+
+		"\tfont=%s",
+		string(data), data, numChars, numMisses, font)
+
+	return string(data), numChars, numMisses, ErrBadText
 }
 
 // ToPdfObject converts the PdfFont object to its PDF representation.
@@ -384,7 +395,7 @@ func newFontSkeletonFromPdfObject(fontObj PdfObject) (*fontSkeleton, error) {
 	d, ok := dictObj.(*PdfObjectDictionary)
 	if !ok {
 		common.Log.Debug("ERROR: Font not given by a dictionary (%T)", fontObj)
-		return nil, ErrUnsupportedFont
+		return nil, ErrFontNotSupported
 	}
 	font.dict = d
 

@@ -15,6 +15,7 @@ var (
 	ErrTypeError                = errors.New("Type check error")
 	ErrRangeError               = errors.New("Range check error")
 	ErrEncrypted                = errors.New("File needs to be decrypted first")
-	ErrUnsupportedFont          = errors.New("Unsupported font type")
 	ErrBadText                  = errors.New("Could not decode text")
+	ErrBadTextToUnicode         = errors.New("Could not decode text (ToUnicode)")
+	ErrNoFont                   = errors.New("Font not defined")
 )
