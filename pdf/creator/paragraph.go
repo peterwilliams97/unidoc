@@ -76,7 +76,7 @@ func NewParagraph(text string) *Paragraph {
 	p.lineHeight = 1.0
 
 	// TODO: Can we wrap intellectually, only if given width is known?
-	p.enableWrap = true
+	// p.enableWrap = true This gives a bad state since p.wrapWidth = 0
 	p.SetColor(ColorRGBFrom8bit(0, 0, 0))
 	p.alignment = TextAlignmentLeft
 	p.angle = 0
@@ -178,17 +178,19 @@ func (p *Paragraph) GetMargins() (float64, float64, float64, float64) {
 // SetWidth sets the the Paragraph width. This is essentially the wrapping width, i.e. the width the text can extend to
 // prior to wrapping over to next line.
 func (p *Paragraph) SetWidth(width float64) {
+	p.enableWrap = true
 	p.wrapWidth = width
 	p.wrapText()
 }
 
 // Width returns the width of the Paragraph.
 func (p *Paragraph) Width() float64 {
-	if p.enableWrap {
+	w := p.getTextWidth() / 1000.0
+	if p.enableWrap && w > p.wrapWidth {
 		return p.wrapWidth
-	} else {
-		return p.getTextWidth() / 1000.0
 	}
+	return w
+
 }
 
 // Height returns the height of the Paragraph. The height is calculated based on the input text and how it is wrapped
@@ -249,7 +251,7 @@ func (p *Paragraph) wrapText() error {
 
 		metrics, found := p.textFont.GetGlyphCharMetrics(glyph)
 		if !found {
-			common.Log.Debug("Glyph char metrics not found! %s\n", glyph)
+			common.Log.Debug("ERROR: Glyph char metrics not found! %s\n", glyph)
 			return errors.New("Glyph char metrics missing") // XXX/FIXME: return error.
 		}
 
