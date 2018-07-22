@@ -247,6 +247,11 @@ var charcodeBytesToUnicodeTest = []fontFragmentTest{
 			177, 151, 178, 179, 183, 185, 188, 205, 184, 189},
 		"‘ł’ “Ł” Ø `o´ it's ˝ˆ˜¯˘˙¨˚ˇªº‹ı›—–—†‡•„…˛¸‰",
 	},
+	fontFragmentTest{"tex glyphs 48->′",
+		"testdata/noise-contrast.txt", 36,
+		[]byte{33, 48, 65, 104, 149, 253},
+		"!′Ah•ý",
+	},
 }
 
 type fontFragmentTest struct {
