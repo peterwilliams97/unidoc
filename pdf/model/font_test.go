@@ -11,6 +11,7 @@ import (
 	"github.com/unidoc/unidoc/pdf/core"
 	"github.com/unidoc/unidoc/pdf/model"
 	"github.com/unidoc/unidoc/pdf/model/fonts"
+	"github.com/unidoc/unidoc/pdf/model/textencoding"
 )
 
 func init() {
@@ -266,6 +267,26 @@ var charcodeBytesToUnicodeTest = []fontFragmentTest{
 		[]byte{32, 40, 48, 64, 80, 88, 65, 104, 149, 253},
 		"({∑∑h•ý",
 	},
+	fontFragmentTest{".notdef glyphs",
+		"testdata/lec10.txt", 6,
+		[]byte{59, 66},
+		string([]rune{textencoding.MissingCodeRune, textencoding.MissingCodeRune}),
+	},
+	fontFragmentTest{"Numbered glyphs pattern 1",
+		"testdata/v14.txt", 14,
+		[]byte{24, 25, 26, 27, 29},
+		" ffifflfffi",
+	},
+	fontFragmentTest{"Glyph aliases",
+		"testdata/townes.txt", 10,
+		[]byte{2, 3, 4, 5, 6, 7, 1, 8, 9, 5, 1, 10, 9, 5, 48},
+		"Townes van Zan…",
+	},
+	fontFragmentTest{"Glyph `.` extensions. e.g. `integral.disp`",
+		"testdata/preview.txt", 156,
+		[]byte{83, 0, 4, 67, 62, 64, 100, 65},
+		"∫=≈≥∈<d>",
+	},
 }
 
 type fontFragmentTest struct {
@@ -306,8 +327,8 @@ func (f *fontFragmentTest) check(t *testing.T) {
 		return
 	}
 	if actualText != f.expected {
-		t.Errorf("Incorrect decoding. %s\nexpected=%q\n  actual=%q",
-			f, f.expected, actualText)
+		t.Errorf("Incorrect decoding. %s\nexpected=%q=\"%s\"\n  actual=%q=\"%s\"",
+			f, f.expected, f.expected, actualText, actualText)
 	}
 	if numChars != len([]rune(actualText)) {
 		t.Errorf("Incorrect numChars. %s numChars=%d expected=%d\n%+v\n%c",

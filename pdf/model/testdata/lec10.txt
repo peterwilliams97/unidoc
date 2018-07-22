@@ -1,0 +1,31 @@
+6 0 obj <<
+/Type /Font
+/Subtype /Type1
+/Encoding 82 0 R
+/FirstChar 58
+/LastChar 121
+/Widths 83 0 R
+/BaseFont /RHCYZH+CMBX10
+/FontDescriptor 4 0 R
+>> endobj
+4 0 obj <<
+/Ascent 694
+/CapHeight 686
+/Descent -194
+/FontName /RHCYZH+CMBX10
+/ItalicAngle 0
+/StemV 114
+/XHeight 444
+/FontBBox [-301 -250 1164 946]
+/Flags 4
+/CharSet (/colon/A/C/P/S/T/a/c/d/e/f/g/h/i/l/m/n/o/p/r/s/t/u/v/y)
+/FontFile 5 0 R
+>> endobj
+82 0 obj <<
+/Type /Encoding
+/Differences [ 0 /.notdef 58/colon 59/.notdef 65/A 66/.notdef 67/C 68/.notdef 80/P 81/.notdef 83/S/T 85/.notdef 97/a 98/.notdef 99/c/d/e/f/g/h/i 106/.notdef 108/l/m/n/o/p 113/.notdef 114/r/s/t/u/v 119/.notdef 121/y 122/.notdef]
+>> endobj
+83 0 obj
+[319 0 0 0 0 0 0 869 0 831 0 0 0 0 0 0 0 0 0 0 0 0 786 0 0 639 800 0 0 0 0 0 0 0 0 0 0 0 0 559 0 511 639 527 351 575 639 319 0 0 319 958 639 575 639 0 474 454 447 639 607 0 0 607 ]
+endobj
+ 
