@@ -247,6 +247,15 @@ var charcodeBytesToUnicodeTest = []fontFragmentTest{
 			177, 151, 178, 179, 183, 185, 188, 205, 184, 189},
 		"‘ł’ “Ł” Ø `o´ it's ˝ˆ˜¯˘˙¨˚ˇªº‹ı›—–—†‡•„…˛¸‰",
 	},
+	fontFragmentTest{"base glyphs′",
+		"testdata/cover.txt", 11,
+		[]byte{44, 45, 46, 48, 49, 50, 51, 53, 54, 55, 56, 58, 59,
+			65, 66, 67, 68, 69, 70, 71, 72,
+			84, 85,
+			97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 108, 109, 110, 111,
+			114, 115, 116, 117},
+		",-.01235678:;ABCDEFGHTUabcdefghijlmnorstu",
+	},
 	fontFragmentTest{"tex glyphs 48->′",
 		"testdata/noise-contrast.txt", 36,
 		[]byte{33, 48, 65, 104, 149, 253},
@@ -297,8 +306,8 @@ func (f *fontFragmentTest) check(t *testing.T) {
 		return
 	}
 	if actualText != f.expected {
-		t.Errorf("Incorrect decoding. %s\nexpected=%q\n  actual=%q=%s",
-			f, f.expected, actualText, actualText)
+		t.Errorf("Incorrect decoding. %s\nexpected=%q\n  actual=%q",
+			f, f.expected, actualText)
 	}
 	if numChars != len([]rune(actualText)) {
 		t.Errorf("Incorrect numChars. %s numChars=%d expected=%d\n%+v\n%c",
