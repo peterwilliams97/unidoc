@@ -200,8 +200,8 @@ func (cmap *CMap) CharcodeToUnicode2(code CharCode) (string, bool) {
 	if s, ok := cmap.codeToUnicode[code]; ok {
 		return s, true
 	}
-	common.Log.Debug("ERROR: CharcodeToUnicode could not convert code=0x%04x. cmap=%s. Returning %q",
-		code, cmap, MissingCodeString)
+	// common.Log.Debug("ERROR: CharcodeToUnicode could not convert code=0x%04x. cmap=%s. Returning %q",
+	// 	code, cmap, MissingCodeString)
 	return MissingCodeString, false
 }
 

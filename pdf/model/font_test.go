@@ -252,6 +252,11 @@ var charcodeBytesToUnicodeTest = []fontFragmentTest{
 		[]byte{33, 48, 65, 104, 149, 253},
 		"!′Ah•ý",
 	},
+	fontFragmentTest{"additional glyphs",
+		"testdata/noise-contrast.txt", 34,
+		[]byte{32, 40, 48, 64, 80, 88, 65, 104, 149, 253},
+		"({∑∑h•ý",
+	},
 }
 
 type fontFragmentTest struct {
@@ -292,8 +297,8 @@ func (f *fontFragmentTest) check(t *testing.T) {
 		return
 	}
 	if actualText != f.expected {
-		t.Errorf("Incorrect decoding. %s\nexpected=%q\n  actual=%q",
-			f, f.expected, actualText)
+		t.Errorf("Incorrect decoding. %s\nexpected=%q\n  actual=%q=%s",
+			f, f.expected, actualText, actualText)
 	}
 	if numChars != len([]rune(actualText)) {
 		t.Errorf("Incorrect numChars. %s numChars=%d expected=%d\n%+v\n%c",
