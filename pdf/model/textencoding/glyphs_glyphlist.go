@@ -48,13 +48,14 @@ func GlyphToRune(glyph string) (rune, bool) {
 	if r, ok := glyphlistGlyphToRuneMap[glyph]; ok {
 		return r, true
 	}
+	if r, ok := tex2GlyphlistGlyphToRuneMap[glyph]; ok {
+		return r, true
+	}
 	if s, ok := texGlyphlistGlyphToStringMap[glyph]; ok {
 		// XXX: Hack. Use the first rune in the teX mapping
 		return []rune(s)[0], true
 	}
-	if r, ok := tex2GlyphlistGlyphToRuneMap[glyph]; ok {
-		return r, true
-	}
+
 	if r, ok := additionalGlyphlistGlyphToRuneMap[glyph]; ok {
 		return r, true
 	}
