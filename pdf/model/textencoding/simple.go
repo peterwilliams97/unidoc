@@ -189,7 +189,7 @@ func (se *SimpleEncoder) makeEncoder() {
 		for code, glyph := range se.differences {
 			r, ok := GlyphToRune(glyph)
 			if !ok {
-				common.Log.Debug("ERROR: No match for glyph=%q differences=%+v", glyph, se.differences)
+				common.Log.Debug("No match for glyph=%q differences=%+v", glyph, se.differences)
 			}
 			codeToRune[uint16(code)] = r
 		}
@@ -202,7 +202,7 @@ func (se *SimpleEncoder) makeEncoder() {
 		codeToGlyph[code] = glyph
 		glyphToCode[glyph] = code
 		if glyph == "" {
-			common.Log.Debug("ERROR: Empty glyph code=0x%04x r=%+q=%#q", code, r, r)
+			common.Log.Debug("Empty glyph. code=0x%04x r=%+q=%#q", code, r, r)
 		}
 	}
 	se.codeToGlyph = codeToGlyph
