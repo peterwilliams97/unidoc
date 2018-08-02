@@ -58,6 +58,13 @@ func (font PdfFont) ToUnicode() string {
 	return font.baseFields().toUnicodeCmap.Name()
 }
 
+// DefaultFont returns the default font as a *PdfFont.
+// We arbitrarily return Courier.
+func DefaultFont() *PdfFont {
+	font, _ := NewStandard14Font("Courier")
+	return font
+}
+
 // NewStandard14Font returns the standard 14 font named `basefont` as a *PdfFont, or an error if it
 // `basefont` is not one the standard 14 font names.
 func NewStandard14Font(basefont string) (*PdfFont, error) {
