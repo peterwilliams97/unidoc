@@ -294,12 +294,11 @@ func (name *PdfObjectName) DefaultWriteString() string {
 	}
 
 	output.WriteString("/")
-	for i := 0; i < len(*name); i++ {
-		char := (*name)[i]
-		if !IsPrintable(char) || char == '#' || IsDelimiter(char) {
-			output.WriteString(fmt.Sprintf("#%.2x", char))
+	for _, c := range []byte(*name) {
+		if !IsPrintable(c) || c == '#' || IsDelimiter(c) {
+			output.WriteString(fmt.Sprintf("#%.2x", c))
 		} else {
-			output.WriteByte(char)
+			output.WriteByte(c)
 		}
 	}
 
