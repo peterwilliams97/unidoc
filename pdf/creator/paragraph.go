@@ -235,7 +235,7 @@ func (p *Paragraph) wrapText() error {
 	}
 
 	line := []rune{}
-	lineWidth := float64(0.0)
+	lineWidth := 0.0
 	p.textLines = []string{}
 
 	runes := []rune(p.text)
@@ -245,13 +245,13 @@ func (p *Paragraph) wrapText() error {
 	for _, val := range runes {
 		glyph, found := p.encoder.RuneToGlyph(val)
 		if !found {
-			common.Log.Debug("Error! Glyph not found for rune: %v\n", val)
+			common.Log.Debug("ERROR: Glyph not found for rune: %v", val)
 			return errors.New("Glyph not found for rune") // XXX/FIXME: return error.
 		}
 
 		metrics, found := p.textFont.GetGlyphCharMetrics(glyph)
 		if !found {
-			common.Log.Debug("ERROR: Glyph char metrics not found! %s\n", glyph)
+			common.Log.Debug("ERROR: Glyph char metrics not found! %s", glyph)
 			return errors.New("Glyph char metrics missing") // XXX/FIXME: return error.
 		}
 
@@ -304,8 +304,8 @@ func (p *Paragraph) wrapText() error {
 	return nil
 }
 
-// GeneratePageBlocks generates the page blocks.  Multiple blocks are generated if the contents wrap over
-// multiple pages. Implements the Drawable interface.
+// GeneratePageBlocks generates the page blocks.  Multiple blocks are generated if the contents wrap
+// over multiple pages. Implements the Drawable interface.
 func (p *Paragraph) GeneratePageBlocks(ctx DrawContext) ([]*Block, DrawContext, error) {
 	origContext := ctx
 	blocks := []*Block{}
