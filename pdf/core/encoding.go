@@ -34,6 +34,7 @@ import (
 	lzw1 "golang.org/x/image/tiff/lzw"
 
 	"github.com/unidoc/unidoc/common"
+	"github.com/unidoc/unidoc/contrib/got.6"
 )
 
 const (
@@ -1015,7 +1016,7 @@ func (this *DCTEncoder) DecodeStream(streamObj *PdfObjectStream) ([]byte, error)
 	return this.DecodeBytes(streamObj.Stream)
 }
 
-// DrawableImage is same as golang image/draw's Image interface that allow drawing images.
+// DrawableImage is same as golang image/draw's Image interface that allows drawing images.
 type DrawableImage interface {
 	ColorModel() gocolor.Model
 	Bounds() goimage.Rectangle
@@ -1528,10 +1529,86 @@ func (this *RawEncoder) EncodeBytes(data []byte) ([]byte, error) {
 //
 // CCITTFax encoder/decoder (dummy, for now)
 //
-type CCITTFaxEncoder struct{}
+type CCITTFaxEncoder struct {
+	Group            int
+	K                int
+	Columns          int
+	BlackIs1         bool
+	EncodedByteAlign bool
+}
 
 func NewCCITTFaxEncoder() *CCITTFaxEncoder {
-	return &CCITTFaxEncoder{}
+	return &CCITTFaxEncoder{
+		Group:            got6.CCITTGroup3,
+		K:                0,
+		Columns:          0,
+		BlackIs1:         false,
+		EncodedByteAlign: false,
+	}
+}
+
+// Create a new CCITT Fax decoder from a stream object, getting all the encoding parameters
+// from the DecodeParms stream object dictionary entry.
+func newCCITTFaxEncoderFromStream(streamObj *PdfObjectStream, decodeParams *PdfObjectDictionary) (*CCITTFaxEncoder, error) {
+	common.Log.Trace("newCCITTFaxEncoderFromStream")
+
+	encoder := NewCCITTFaxEncoder()
+
+	encDict := streamObj.PdfObjectDictionary
+	if encDict == nil {
+		// No encoding dictionary.
+		return encoder, nil
+	}
+
+	// If decodeParams not provided, see if we can get from the stream.
+	if decodeParams == nil {
+		obj := TraceToDirectObject(encDict.Get("DecodeParms"))
+		if obj != nil {
+			if arr, isArr := GetArray(obj); isArr {
+				if arr.Len() != 1 {
+					common.Log.Debug("ERROR: DecodeParms array length != 1 (%d)", arr.Len())
+					return nil, ErrRangeError
+				}
+				obj = TraceToDirectObject(arr.Get(0))
+			}
+
+			dp, isDict := GetDict(obj)
+			if !isDict {
+				common.Log.Debug("ERROR: DecodeParms not a dictionary (%T)", obj)
+				return nil, errors.New("Invalid DecodeParms")
+			}
+			decodeParams = dp
+		}
+	}
+	if decodeParams == nil {
+		// Can safely return here if no decode params, as the following depend on the decode params.
+		return encoder, nil
+	}
+
+	common.Log.Trace("decode params: %s", decodeParams.String())
+
+	// <0 : Pure two-dimensional encoding (Group 4)
+	// =0 : Pure one-dimensional encoding (Group 3, 1-D)
+	// >0 : Mixed one- and two-dimensional encoding (Group 3, 2-D)
+	if v, ok := GetIntVal(decodeParams.Get("K")); ok {
+		if v > 0 {
+			return nil, errors.New("newCCITTFaxEncoderFromStream: K > 0 currently unsupported")
+		}
+		encoder.K = v
+		if v < 0 {
+			encoder.Group = got6.CCITTGroup4
+		}
+	}
+	if v, ok := GetIntVal(decodeParams.Get("Columns")); ok {
+		encoder.Columns = v
+	}
+	if v, ok := GetIntVal(decodeParams.Get("BlackIs1")); ok {
+		encoder.BlackIs1 = v == 1
+	}
+	if v, ok := GetIntVal(decodeParams.Get("EncodedByteAlign")); ok {
+		encoder.EncodedByteAlign = v == 1
+	}
+	return encoder, nil
 }
 
 func (this *CCITTFaxEncoder) GetFilterName() string {
@@ -1548,17 +1625,15 @@ func (this *CCITTFaxEncoder) MakeStreamDict() *PdfObjectDictionary {
 }
 
 func (this *CCITTFaxEncoder) DecodeBytes(encoded []byte) ([]byte, error) {
-	common.Log.Debug("Error: Attempting to use unsupported encoding %s", this.GetFilterName())
-	return encoded, ErrNoCCITTFaxDecode
+	return got6.DecodeBytes(encoded, this.Group, this.Columns)
 }
 
 func (this *CCITTFaxEncoder) DecodeStream(streamObj *PdfObjectStream) ([]byte, error) {
-	common.Log.Debug("Error: Attempting to use unsupported encoding %s", this.GetFilterName())
-	return streamObj.Stream, ErrNoCCITTFaxDecode
+	return this.DecodeBytes(streamObj.Stream)
 }
 
 func (this *CCITTFaxEncoder) EncodeBytes(data []byte) ([]byte, error) {
-	common.Log.Debug("Error: Attempting to use unsupported encoding %s", this.GetFilterName())
+	common.Log.Debug("ERROR: Attempting to use unsupported encoding %s", this.GetFilterName())
 	return data, ErrNoCCITTFaxDecode
 }
 

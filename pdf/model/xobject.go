@@ -7,6 +7,7 @@ package model
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/unidoc/unidoc/common"
 	. "github.com/unidoc/unidoc/pdf/core"
@@ -216,6 +217,12 @@ type XObjectImage struct {
 	Stream       []byte
 	// Primitive
 	primitive *PdfObjectStream
+}
+
+func (img *XObjectImage) String() string {
+	return fmt.Sprintf("color=%T bpc=%d %dx%d %T",
+		img.ColorSpace, *img.BitsPerComponent, *img.Width, *img.Height, img.Filter)
+
 }
 
 func NewXObjectImage() *XObjectImage {

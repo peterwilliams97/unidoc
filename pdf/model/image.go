@@ -7,6 +7,7 @@ package model
 
 import (
 	"errors"
+	"fmt"
 	goimage "image"
 	gocolor "image/color"
 	"image/draw"
@@ -36,6 +37,11 @@ type Image struct {
 	decode []float64 // [Dmin Dmax ... values for each color component]
 }
 
+func (img Image) String() string {
+	return fmt.Sprintf("color=%d bpc=%d %dx%d",
+		img.ColorComponents, img.BitsPerComponent, img.Width, img.Height)
+}
+
 // AlphaMapFunc represents a alpha mapping function: byte -> byte. Can be used for
 // thresholding the alpha channel, i.e. setting all alpha values below threshold to transparent.
 type AlphaMapFunc func(alpha byte) byte
@@ -55,7 +61,8 @@ func (img *Image) GetSamples() []uint32 {
 	expectedLen := int(img.Width) * int(img.Height) * img.ColorComponents
 	if len(samples) < expectedLen {
 		// Return error, or fill with 0s?
-		common.Log.Debug("Error: Too few samples (got %d, expecting %d)", len(samples), expectedLen)
+		common.Log.Debug("ERROR: Too few samples (got %d, expecting %d) diff=%d",
+			len(samples), expectedLen, len(samples)-expectedLen)
 		return samples
 	} else if len(samples) > expectedLen {
 		samples = samples[:expectedLen]

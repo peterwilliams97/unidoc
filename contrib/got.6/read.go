@@ -4,15 +4,76 @@
 package got6
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 	"image"
 	"io"
+
+	"github.com/unidoc/unidoc/common"
+)
+
+// CCITT encoding modes.
+const (
+	CCITTGroup3 = iota
+	CCITTGroup4
 )
 
 const (
 	white = 0xFF
 	black = 0x00
 )
+
+// DecodeBytes decodes the CCITTFax encoded bytes in `reader`. It returns these as an 8-bit
+// grayscale raster of width `columns`. Currently only Group 4 is supported.
+func DecodeBytes(encoded []byte, group, columns int) ([]byte, error) {
+	reader := bytes.NewBuffer(encoded)
+	switch group {
+	case CCITTGroup3:
+		errors.New("CCITTFaxEncoder Group 3 not implemented")
+	case CCITTGroup4:
+		return decodeBytesG4(reader, columns)
+	}
+	return nil, fmt.Errorf("unknown CCITTFaxEncoder group %d", group)
+}
+
+// decodeBytesG4 decodes the CCITTFax Group 4 encoded bytes in `reader`. It returns these as an
+// 8-bit grayscale raster of width `width`.
+func decodeBytesG4(reader io.ByteReader, width int) ([]byte, error) {
+
+	if width < 0 {
+		return nil, negativeWidth
+	}
+	if width == 0 {
+		return []byte{}, nil
+	}
+
+	pixels := make([]byte, width, width*(width+10))
+	// imaginary first line
+	for i := 0; i < width; i++ {
+		pixels[i] = white
+	}
+
+	d := &decoder{
+		reader:    reader,
+		pixels:    pixels,
+		width:     width,
+		atNewLine: true,
+		color:     white,
+	}
+
+	// Initiate d.head
+	if err := d.pop(0); err != nil {
+		return nil, err
+	}
+	b, err := d.parseBytes()
+
+	// Add a white line at the end to make the image the match its height x width in the PDF dict.
+	for i := 0; i < width; i++ {
+		b = append(b, white)
+	}
+	return b, err
+}
 
 var negativeWidth = errors.New("fax: negative width specified")
 
@@ -119,6 +180,19 @@ func (d *decoder) parse() (result image.Image, err error) {
 	bounds := image.Rect(0, 0, width, len(pixels)/width)
 	result = &image.Gray{pixels, width, bounds}
 	return
+}
+
+func (d *decoder) parseBytes() ([]byte, error) {
+	common.Log.Debug("parseBytes")
+	var err error
+	// parse until end-of-facsimile block: 0x001001
+	for d.head&0xFE000000 != 0 && err == nil {
+		i := (d.head >> 28) & 0xF
+		err = modeTable[i](d)
+	}
+
+	pixels := d.pixels[d.width:] // strip imaginary line
+	return pixels, err
 }
 
 var modeTable = [16]func(d *decoder) error{
