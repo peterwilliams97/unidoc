@@ -138,7 +138,7 @@ func (img *Image) Resample(targetBitsPerComponent int64) {
 
 // ToGoImage converts the unidoc Image to a golang Image structure.
 func (img *Image) ToGoImage() (goimage.Image, error) {
-	common.Log.Trace("Converting to go image")
+	common.Log.Trace("Converting to go image: %s", img)
 	bounds := goimage.Rect(0, 0, int(img.Width), int(img.Height))
 	var imgout DrawableImage
 
