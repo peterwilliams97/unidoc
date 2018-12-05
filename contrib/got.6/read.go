@@ -26,6 +26,8 @@ const (
 
 // DecodeBytes decodes the CCITTFax encoded bytes in `reader`. It returns these as an 8-bit
 // grayscale raster of width `columns`. Currently only Group 4 is supported.
+// TODO(peterwilliams97): Return image data as 1 bit per pixel.
+// TODO(peterwilliams97): Handle Group 3 images?
 func DecodeBytes(encoded []byte, group, columns int) ([]byte, error) {
 	reader := bytes.NewBuffer(encoded)
 	switch group {
